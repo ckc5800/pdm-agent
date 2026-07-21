@@ -1,0 +1,26 @@
+{
+  "dataset": "FD002",
+  "k": 3.0,
+  "rul_model": "exp",
+  "regimes": 6,
+  "engines_eval": 130,
+  "life_range": [
+    128,
+    340
+  ],
+  "detected_before_failure": 104,
+  "lead_time_median": 22.0,
+  "premature_alarms_first30pct": 0,
+  "rul": {
+    "30": {
+      "evaluated": 109,
+      "mae_cycles": 23.7,
+      "median_abs_err": 13.2
+    },
+    "50": {
+      "evaluated": 57,
+      "mae_cycles": 29.2,
+      "median_abs_err": 21.7
+    }
+  }
+}

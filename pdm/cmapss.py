@@ -36,3 +36,55 @@ def load(path: str | Path) -> dict[int, dict[str, list[float]]]:
             idx = 4 + int(s[1:])  # s1 → col 5
             eng[s].append(sign * float(cols[idx]))
     return engines
+
+
+# ── FD002/FD004: 운전 조건(regime)별 정규화 ─────────────────────
+#
+# FD002는 고도/마하수 등 운전 조건 6개를 오가며 운전된다. 조건이 바뀌면
+# 센서 절대값이 열화와 무관하게 크게 널뛰므로, 조건별로 z-정규화해야
+# 열화 추세가 드러난다.
+
+def regime_key(s1: float, s2: float, s3: float) -> tuple:
+    """설정값을 반올림해 운전 조건 키로 사용 (FD002에서 6개로 떨어짐)."""
+    return (round(s1), round(s2, 2), round(s3))
+
+
+def load_rows(path: str | Path) -> dict[int, list[tuple[tuple, dict[str, float]]]]:
+    """유닛별 (regime_key, {sensor: 원시값}) 행 목록."""
+    rows: dict[int, list[tuple[tuple, dict[str, float]]]] = {}
+    for line in Path(path).read_text().splitlines():
+        cols = line.split()
+        if not cols:
+            continue
+        unit = int(cols[0])
+        key = regime_key(float(cols[2]), float(cols[3]), float(cols[4]))
+        sensors = {s: float(cols[4 + int(s[1:])]) for s in SENSORS}
+        rows.setdefault(unit, []).append((key, sensors))
+    return rows
+
+
+def regime_stats(rows: dict[int, list], units: list[int]) -> dict:
+    """보정용 유닛들의 행으로 (regime, sensor)별 평균/표준편차 계산."""
+    import statistics
+    acc: dict[tuple, dict[str, list[float]]] = {}
+    for u in units:
+        for key, sensors in rows[u]:
+            bucket = acc.setdefault(key, {s: [] for s in SENSORS})
+            for s, v in sensors.items():
+                bucket[s].append(v)
+    return {key: {s: (statistics.fmean(vals), statistics.pstdev(vals) or 1e-9)
+                  for s, vals in bucket.items()}
+            for key, bucket in acc.items()}
+
+
+def normalize(rows: dict[int, list], stats: dict) -> dict[int, dict[str, list[float]]]:
+    """조건별 z-정규화 후 방향 통일. 반환 형식은 load()와 동일."""
+    engines: dict[int, dict[str, list[float]]] = {}
+    for u, unit_rows in rows.items():
+        eng = engines.setdefault(u, {s: [] for s in SENSORS})
+        for key, sensors in unit_rows:
+            st = stats[key]
+            for s, sign in SENSORS.items():
+                mu, sd = st[s]
+                eng[s].append(sign * (sensors[s] - mu) / sd)
+    return engines
