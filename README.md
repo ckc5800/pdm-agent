@@ -1,5 +1,7 @@
 # pdm-agent
 
+![CI](https://github.com/ckc5800/pdm-agent/actions/workflows/ci.yml/badge.svg)
+
 설비 센서 시계열에서 이상을 탐지하고, LLM이 정비 진단 리포트를 쓰는
 예지보전(Predictive Maintenance) 데모.
 
