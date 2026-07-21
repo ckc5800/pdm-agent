@@ -83,6 +83,16 @@ def detect_level_shift(values: list[float], sensor: str,
     return events
 
 
+def linreg_slope(y: list[float]) -> float:
+    """최소제곱 선형회귀 기울기 (샘플 1개당 증가량)."""
+    n = len(y)
+    xbar = (n - 1) / 2
+    ybar = statistics.fmean(y)
+    sxy = sum((i - xbar) * (v - ybar) for i, v in enumerate(y))
+    sxx = sum((i - xbar) ** 2 for i in range(n))
+    return sxy / sxx
+
+
 def detect_trend(values: list[float], sensor: str,
                  window: int = 12 * 60, slope_th: float = 0.0008,
                  limit: float | None = None) -> list[AnomalyEvent]:
@@ -90,12 +100,7 @@ def detect_trend(values: list[float], sensor: str,
     if len(values) < window:
         return []
     y = values[-window:]
-    n = len(y)
-    xbar = (n - 1) / 2
-    ybar = statistics.fmean(y)
-    sxy = sum((i - xbar) * (v - ybar) for i, v in enumerate(y))
-    sxx = sum((i - xbar) ** 2 for i in range(n))
-    slope = sxy / sxx  # 분당 증가량
+    slope = linreg_slope(y)  # 분당 증가량
     if slope < slope_th:
         return []
     evidence = f"최근 {window // 60}시간 기울기 +{slope * 60:.3f}/시간 — 점진적 상승 추세"

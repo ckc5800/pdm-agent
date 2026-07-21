@@ -1,0 +1,24 @@
+{
+  "k": 4.0,
+  "engines": 100,
+  "life_range": [
+    128,
+    362
+  ],
+  "detected_before_failure": 63,
+  "lead_time_median": 22,
+  "lead_time_min": 11,
+  "premature_alarms_first30pct": 0,
+  "rul": {
+    "30": {
+      "evaluated": 50,
+      "mae_cycles": 28.5,
+      "median_abs_err": 24.2
+    },
+    "50": {
+      "evaluated": 50,
+      "mae_cycles": 58.8,
+      "median_abs_err": 52.8
+    }
+  }
+}
