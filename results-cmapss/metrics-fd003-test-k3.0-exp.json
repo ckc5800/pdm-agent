@@ -1,0 +1,25 @@
+{
+  "dataset": "FD003",
+  "split": "test",
+  "k": 3.0,
+  "rul_model": "exp",
+  "fused": false,
+  "engines": 100,
+  "true_rul_range": [
+    6,
+    145
+  ],
+  "answered": 43,
+  "coverage_pct": 43.0,
+  "answered_true_rul_median": 35,
+  "mae_cycles": 20.4,
+  "rmse_cycles": 31.6,
+  "worst_late_cycles": 91.6,
+  "phm08_score": 24816.8,
+  "cap125": {
+    "mae_cycles": 19.0,
+    "rmse_cycles": 28.0,
+    "phm08_score": 6073.2,
+    "phm08_per_engine": 141.24
+  }
+}

@@ -77,13 +77,18 @@ def regime_stats(rows: dict[int, list], units: list[int]) -> dict:
             for key, bucket in acc.items()}
 
 
+def _nearest_key(key: tuple, stats: dict) -> tuple:
+    """보정 데이터에 없던 조건 키는 설정값이 가장 가까운 조건으로 매핑."""
+    return min(stats, key=lambda k: sum((a - b) ** 2 for a, b in zip(k, key)))
+
+
 def normalize(rows: dict[int, list], stats: dict) -> dict[int, dict[str, list[float]]]:
     """조건별 z-정규화 후 방향 통일. 반환 형식은 load()와 동일."""
     engines: dict[int, dict[str, list[float]]] = {}
     for u, unit_rows in rows.items():
         eng = engines.setdefault(u, {s: [] for s in SENSORS})
         for key, sensors in unit_rows:
-            st = stats[key]
+            st = stats.get(key) or stats[_nearest_key(key, stats)]
             for s, sign in SENSORS.items():
                 mu, sd = st[s]
                 eng[s].append(sign * (sensors[s] - mu) / sd)

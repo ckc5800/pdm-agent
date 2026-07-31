@@ -1,13 +1,18 @@
 {
-  "k": 2.5,
-  "engines": 100,
+  "dataset": "FD001",
+  "split": "train",
+  "k": 3.0,
+  "rul_model": "linear",
+  "fused": false,
+  "regimes": null,
+  "engines_alarm": 100,
+  "engines_rul": 50,
   "life_range": [
     128,
     362
   ],
-  "detected_before_failure": 99,
-  "lead_time_median": 37,
-  "lead_time_min": 13,
+  "detected_before_failure": 94,
+  "lead_time_median": 30.5,
   "premature_alarms_first30pct": 0,
   "rul": {
     "30": {

@@ -1,12 +1,15 @@
 {
   "dataset": "FD002",
+  "split": "train",
   "k": 3.0,
   "rul_model": "exp",
+  "fused": false,
   "regimes": 6,
-  "engines_eval": 130,
+  "engines_alarm": 130,
+  "engines_rul": 130,
   "life_range": [
     128,
-    340
+    378
   ],
   "detected_before_failure": 104,
   "lead_time_median": 22.0,

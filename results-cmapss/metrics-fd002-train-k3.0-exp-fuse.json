@@ -1,0 +1,29 @@
+{
+  "dataset": "FD002",
+  "split": "train",
+  "k": 3.0,
+  "rul_model": "exp",
+  "fused": true,
+  "regimes": 6,
+  "engines_alarm": 130,
+  "engines_rul": 130,
+  "life_range": [
+    128,
+    378
+  ],
+  "detected_before_failure": 130,
+  "lead_time_median": 50.0,
+  "premature_alarms_first30pct": 0,
+  "rul": {
+    "30": {
+      "evaluated": 126,
+      "mae_cycles": 11.5,
+      "median_abs_err": 8.7
+    },
+    "50": {
+      "evaluated": 101,
+      "mae_cycles": 21.0,
+      "median_abs_err": 13.3
+    }
+  }
+}

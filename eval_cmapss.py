@@ -1,15 +1,25 @@
-"""NASA C-MAPSS FD001 실데이터로 탐지기 검증.
+"""NASA C-MAPSS 검증 CLI — FD001~FD004 통합.
 
 시뮬레이터가 아니라 진짜 벤치마크 데이터에 기존 탐지기를 그대로 적용한다.
-엔진 100대가 전부 고장까지 운전된 데이터라, "고장 전에 경보가 울렸는가"와
-"경보가 얼마나 일찍(또는 너무 일찍) 울렸는가"를 라벨 없이도 측정할 수 있다.
 
-프로토콜
-- 경보: 센서별 EWMA 관리한계 이탈(detect_level_shift 그대로, baseline 30 사이클).
-  서로 다른 센서 2개가 이탈해야 엔진 경보로 인정 (단일 센서 노이즈 방지).
-- RUL: 엔진 1~50의 고장 시점 센서값 중앙값으로 한계치를 보정하고,
-  엔진 51~100에서 고장 30/50 사이클 전 시점에 선형 외삽 RUL을 평가.
-  (보정과 평가를 분리해 라벨 누수를 막는다)
+두 가지 프로토콜:
+
+--split train (기본): run-to-failure인 train 셋을 반으로 갈라
+  보정(한계치·정규화 통계) / 평가 엔진을 분리한다. "고장 전에 경보가
+  울렸는가"와 "고장 30/50 사이클 전 시점의 RUL 오차"를 잰다.
+  - 경보: 센서별 EWMA 관리한계 이탈, 서로 다른 센서 VOTES개 동시 이탈 시 인정.
+    단일 조건(FD001/FD003)은 경보에 교차 엔진 보정이 없으므로 전체 엔진에서,
+    다중 조건(FD002/FD004)은 정규화 통계가 보정 엔진에 의존하므로
+    평가 엔진에서만 잰다.
+
+--split test: 공식 test 셋 + RUL_FDxxx 정답 라벨 평가.
+  train 전체로 보정하고, 각 test 엔진의 마지막 사이클에서 RUL을 추정해
+  라벨과 비교한다 (MAE / RMSE / PHM08 score). 문헌 수치와 직접 비교할 수
+  있는 유일한 프로토콜 — 단, 추정을 보류한 엔진이 있으면 응답률과 함께
+  보고한다 (전수 응답하는 학습 모델과 조건이 다르다).
+
+다중 조건 셋(FD002/FD004)은 조건별 z-정규화 후 같은 파이프라인을 쓴다.
+--fuse는 센서 10개를 health index 하나로 융합해 경보(1표)·RUL을 잰다.
 """
 import argparse
 import json
@@ -17,95 +27,48 @@ import math
 import statistics
 from pathlib import Path
 
-from pdm.cmapss import SENSORS, load
-from pdm.detectors import detect_level_shift, linreg_slope
+from pdm.cmapss import load, load_rows, normalize, regime_stats
+from pdm.evaluate import (
+    CHECKPOINTS, RUL_MODELS, TREND_WIN, BASELINE, VOTES,
+    calibrate_limits, engine_alarm, health_index, nasa_score,
+)
 
-DATA = Path("data/raw/cmapss/train_FD001.txt")
+RAW = Path("data/raw/cmapss")
 OUT = Path("results-cmapss")
-BASELINE = 30      # 경보 기준선 사이클 수
-VOTES = 2          # 엔진 경보로 인정할 최소 센서 수
-TREND_WIN = 30     # RUL 외삽에 쓰는 최근 구간
-RUL_CAP = 400
-CHECKPOINTS = [30, 50]   # 고장 N 사이클 전에 RUL을 물어본다
+MULTI_REGIME = {"FD002", "FD004"}
 
 
-def first_alarm_cycle(series: list[float], k: float) -> int | None:
-    events = detect_level_shift(series, "cmapss", k=k, baseline_n=BASELINE)
-    return events[0].start_idx if events else None
+def series_len(eng: dict[str, list[float]]) -> int:
+    return len(next(iter(eng.values())))
 
 
-def engine_alarm(eng: dict[str, list[float]], k: float) -> int | None:
-    firsts = sorted(
-        c for c in (first_alarm_cycle(v, k) for v in eng.values()) if c is not None)
-    return firsts[VOTES - 1] if len(firsts) >= VOTES else None
+def fuse_all(engines: dict[int, dict]) -> dict[int, dict]:
+    return {u: health_index(eng) for u, eng in engines.items()}
 
 
-def estimate_rul(eng: dict[str, list[float]], upto: int,
-                 limits: dict[str, float]) -> float | None:
-    """upto 사이클까지만 보고 선형 외삽으로 남은 사이클 추정."""
-    estimates = []
-    for s, series in eng.items():
-        y = series[max(0, upto - TREND_WIN):upto]
-        if len(y) < TREND_WIN:
-            continue
-        slope = linreg_slope(y)
-        if slope <= 0:
-            continue
-        remain = (limits[s] - series[upto - 1]) / slope
-        if 0 < remain <= RUL_CAP:
-            estimates.append(remain)
-    return statistics.median(estimates) if estimates else None
+def eval_train(fd: str, k: float, model: str, fuse: bool) -> dict:
+    if fd in MULTI_REGIME:
+        rows = load_rows(RAW / f"train_{fd}.txt")
+        units = sorted(rows)
+        calib, evalu = units[:len(units) // 2], units[len(units) // 2:]
+        stats = regime_stats(rows, calib)
+        engines = normalize(rows, stats)
+        alarm_units, regimes = evalu, len(stats)
+    else:
+        engines = load(RAW / f"train_{fd}.txt")
+        units = sorted(engines)
+        calib, evalu = units[:len(units) // 2], units[len(units) // 2:]
+        alarm_units, regimes = units, None
 
+    votes = VOTES
+    if fuse:
+        engines, votes = fuse_all(engines), 1
+    lives = {u: series_len(engines[u]) for u in units}
 
-def estimate_rul_exp(eng: dict[str, list[float]], upto: int,
-                     limits: dict[str, float]) -> float | None:
-    """지수 열화 모델: 기준선 대비 편차 d(t)가 지수적으로 커진다고 가정.
-
-    C-MAPSS의 열화는 뒤로 갈수록 가속하는 곡선이라 선형 외삽이 남은 수명을
-    과대평가한다. ln(d)에 선형회귀를 하면 d(t) = A·exp(b·t) 피팅이 되고,
-    한계 편차에 도달하는 시점을 닫힌식으로 구할 수 있다.
-    """
-    estimates = []
-    for s, series in eng.items():
-        base = series[:BASELINE]
-        mu_b = statistics.fmean(base)
-        y = series[max(0, upto - TREND_WIN):upto]
-        if len(y) < TREND_WIN:
-            continue
-        d = [v - mu_b for v in y]
-        # 아직 기준선 근처면(음수 섞임) 지수 모델을 적용할 수 없다
-        if min(d) <= 0:
-            continue
-        ln_d = [math.log(v) for v in d]
-        b = linreg_slope(ln_d)
-        if b <= 0:
-            continue
-        limit_d = limits[s] - mu_b
-        if limit_d <= d[-1]:
-            estimates.append(0.0)
-            continue
-        remain = (math.log(limit_d) - math.log(d[-1])) / b
-        if 0 < remain <= RUL_CAP:
-            estimates.append(remain)
-    return statistics.median(estimates) if estimates else None
-
-
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--k", type=float, default=4.0, help="EWMA 관리한계 kσ")
-    ap.add_argument("--model", choices=["linear", "exp"], default="linear",
-                    help="RUL 외삽 모델")
-    args = ap.parse_args()
-    rul_fn = estimate_rul if args.model == "linear" else estimate_rul_exp
-
-    engines = load(DATA)
-    units = sorted(engines)
-    lives = {u: len(engines[u]["s2"]) for u in units}
-
-    # ── 1. 경보: 고장 전에 울렸는가 ──
+    # ── 경보: 고장 전에 울렸는가 ──
     detected, lead_times, premature = 0, [], 0
-    for u in units:
-        alarm = engine_alarm(engines[u], args.k)
+    for u in alarm_units:
+        alarm = engine_alarm(engines[u], k, votes=votes)
         if alarm is None:
             continue
         detected += 1
@@ -113,12 +76,10 @@ def main():
         if alarm < lives[u] * 0.3:
             premature += 1
 
-    # ── 2. RUL: 보정(1~50) / 평가(51~100) 분리 ──
-    calib, evalu = units[:50], units[50:]
-    limits = {s: statistics.median(engines[u][s][-1] for u in calib)
-              for s in SENSORS}
+    # ── RUL: 보정/평가 엔진 분리 (라벨 누수 차단) ──
+    limits = calibrate_limits(engines, calib)
+    rul_fn = RUL_MODELS[model]
     rul_errors = {cp: [] for cp in CHECKPOINTS}
-    rul_valid = {cp: 0 for cp in CHECKPOINTS}
     for u in evalu:
         for cp in CHECKPOINTS:
             upto = lives[u] - cp
@@ -126,38 +87,113 @@ def main():
                 continue
             est = rul_fn(engines[u], upto, limits)
             if est is not None:
-                rul_valid[cp] += 1
                 rul_errors[cp].append(abs(est - cp))
 
-    summary = {
-        "k": args.k,
-        "rul_model": args.model,
-        "engines": len(units),
+    return {
+        "dataset": fd, "split": "train", "k": k, "rul_model": model,
+        "fused": fuse, "regimes": regimes,
+        "engines_alarm": len(alarm_units), "engines_rul": len(evalu),
         "life_range": [min(lives.values()), max(lives.values())],
         "detected_before_failure": detected,
-        "lead_time_median": statistics.median(lead_times),
-        "lead_time_min": min(lead_times),
+        "lead_time_median": statistics.median(lead_times) if lead_times else None,
         "premature_alarms_first30pct": premature,
         "rul": {str(cp): {
-            "evaluated": rul_valid[cp],
-            "mae_cycles": round(statistics.fmean(rul_errors[cp]), 1) if rul_errors[cp] else None,
-            "median_abs_err": round(statistics.median(rul_errors[cp]), 1) if rul_errors[cp] else None,
-        } for cp in CHECKPOINTS},
+            "evaluated": len(errs),
+            "mae_cycles": round(statistics.fmean(errs), 1) if errs else None,
+            "median_abs_err": round(statistics.median(errs), 1) if errs else None,
+        } for cp, errs in rul_errors.items()},
     }
 
-    OUT.mkdir(exist_ok=True)
-    suffix = f"-{args.model}" if args.model != "linear" else ""
-    out_path = OUT / f"metrics-k{args.k}{suffix}.json"
-    out_path.write_text(json.dumps(summary, indent=2))
 
-    print(f"엔진 {summary['engines']}대 (수명 {summary['life_range'][0]}~{summary['life_range'][1]} 사이클)")
-    print(f"고장 전 경보: {detected}/{len(units)}대")
-    print(f"경보 리드타임: 중앙값 {summary['lead_time_median']:.0f} 사이클, 최소 {summary['lead_time_min']} 사이클")
-    print(f"수명 초반 30% 내 경보(조기 경보): {premature}대")
-    for cp in CHECKPOINTS:
-        r = summary["rul"][str(cp)]
-        print(f"RUL@고장 {cp}사이클 전: 평가 {r['evaluated']}대, "
-              f"MAE {r['mae_cycles']} 사이클, 중앙값 오차 {r['median_abs_err']} 사이클")
+def eval_test(fd: str, k: float, model: str, fuse: bool) -> dict:
+    labels = [int(x) for x in (RAW / f"RUL_{fd}.txt").read_text().split()]
+    if fd in MULTI_REGIME:
+        rows_tr = load_rows(RAW / f"train_{fd}.txt")
+        stats = regime_stats(rows_tr, sorted(rows_tr))
+        train = normalize(rows_tr, stats)
+        test = normalize(load_rows(RAW / f"test_{fd}.txt"), stats)
+    else:
+        train = load(RAW / f"train_{fd}.txt")
+        test = load(RAW / f"test_{fd}.txt")
+
+    if fuse:
+        train, test = fuse_all(train), fuse_all(test)
+    limits = calibrate_limits(train, sorted(train))
+    rul_fn = RUL_MODELS[model]
+
+    errors, errors_cap, answered_true = [], [], []
+    for i, u in enumerate(sorted(test)):
+        est = rul_fn(test[u], series_len(test[u]), limits)
+        if est is None:
+            continue
+        errors.append(est - labels[i])
+        # 문헌 관례: 열화가 보이기 전 구간은 구분 불가하므로 추정치를
+        # 125 사이클에 캡 (piecewise-linear RUL 타깃과 같은 발상)
+        errors_cap.append(min(est, 125) - labels[i])
+        answered_true.append(labels[i])
+
+    n, ans = len(labels), len(errors)
+    return {
+        "dataset": fd, "split": "test", "k": k, "rul_model": model,
+        "fused": fuse, "engines": n,
+        "true_rul_range": [min(labels), max(labels)],
+        "answered": ans, "coverage_pct": round(100 * ans / n, 1),
+        "answered_true_rul_median": statistics.median(answered_true) if answered_true else None,
+        "mae_cycles": round(statistics.fmean(abs(e) for e in errors), 1) if errors else None,
+        "rmse_cycles": round(math.sqrt(statistics.fmean(e * e for e in errors)), 1) if errors else None,
+        "worst_late_cycles": round(max(errors), 1) if errors else None,
+        "phm08_score": round(nasa_score(errors), 1) if errors else None,
+        "cap125": {
+            "mae_cycles": round(statistics.fmean(abs(e) for e in errors_cap), 1) if errors_cap else None,
+            "rmse_cycles": round(math.sqrt(statistics.fmean(e * e for e in errors_cap)), 1) if errors_cap else None,
+            "phm08_score": round(nasa_score(errors_cap), 1) if errors_cap else None,
+            "phm08_per_engine": round(nasa_score(errors_cap) / ans, 2) if errors_cap else None,
+        },
+    }
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--fd", default="FD001",
+                    choices=["FD001", "FD002", "FD003", "FD004"])
+    ap.add_argument("--k", type=float, default=3.0, help="EWMA 관리한계 kσ")
+    ap.add_argument("--model", choices=sorted(RUL_MODELS), default="exp",
+                    help="RUL 외삽 모델")
+    ap.add_argument("--fuse", action="store_true",
+                    help="센서 10개를 health index 하나로 융합")
+    ap.add_argument("--split", choices=["train", "test"], default="train")
+    args = ap.parse_args()
+
+    if args.split == "train":
+        s = eval_train(args.fd, args.k, args.model, args.fuse)
+        print(f"{args.fd} train 프로토콜 (k={args.k}, {args.model}"
+              f"{', fused' if args.fuse else ''})")
+        print(f"고장 전 경보: {s['detected_before_failure']}/{s['engines_alarm']}대"
+              f" | 리드타임 중앙값 {s['lead_time_median']:.0f} 사이클"
+              f" | 수명 초반 30% 내 경보 {s['premature_alarms_first30pct']}대")
+        for cp in CHECKPOINTS:
+            r = s["rul"][str(cp)]
+            print(f"RUL@고장 {cp}사이클 전: 평가 {r['evaluated']}/{s['engines_rul']}대, "
+                  f"MAE {r['mae_cycles']} 사이클, 중앙값 오차 {r['median_abs_err']}")
+    else:
+        s = eval_test(args.fd, args.k, args.model, args.fuse)
+        print(f"{args.fd} 공식 test 셋 (k={args.k}, {args.model}"
+              f"{', fused' if args.fuse else ''})")
+        print(f"엔진 {s['engines']}대 (실제 RUL {s['true_rul_range'][0]}~"
+              f"{s['true_rul_range'][1]} 사이클)")
+        print(f"응답: {s['answered']}/{s['engines']}대 ({s['coverage_pct']}%)"
+              f" — 응답 엔진의 실제 RUL 중앙값 {s['answered_true_rul_median']}")
+        print(f"MAE {s['mae_cycles']} | RMSE {s['rmse_cycles']} | "
+              f"최악 늦은 예측 +{s['worst_late_cycles']} | PHM08 {s['phm08_score']}")
+        c = s["cap125"]
+        print(f"[추정 125캡] MAE {c['mae_cycles']} | RMSE {c['rmse_cycles']} | "
+              f"PHM08 {c['phm08_score']} (엔진당 {c['phm08_per_engine']})")
+
+    OUT.mkdir(exist_ok=True)
+    name = (f"metrics-{s['dataset'].lower()}-{args.split}-k{args.k}-{args.model}"
+            f"{'-fuse' if args.fuse else ''}.json")
+    out_path = OUT / name
+    out_path.write_text(json.dumps(s, indent=2))
     print(f"\n저장: {out_path}")
 
 
