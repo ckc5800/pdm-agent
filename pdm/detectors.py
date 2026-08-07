@@ -59,8 +59,13 @@ def detect_spikes(values: list[float], sensor: str,
 
 def detect_level_shift(values: list[float], sensor: str,
                        alpha: float = 0.05, k: float = 4.0,
-                       baseline_n: int = 240) -> list[AnomalyEvent]:
-    """EWMA가 초기 구간 기준 관리한계를 벗어나는 지속적 수준 이탈 탐지."""
+                       baseline_n: int = 240,
+                       unit: str = "분") -> list[AnomalyEvent]:
+    """EWMA가 초기 구간 기준 관리한계를 벗어나는 지속적 수준 이탈 탐지.
+
+    unit은 근거 문장의 시간 단위 표기. 시뮬레이터는 1분 간격이라 기본값이
+    "분"이고, C-MAPSS처럼 샘플 단위가 다른 데이터는 호출부에서 넘긴다.
+    """
     base = values[:baseline_n]
     mu = statistics.fmean(base)
     sd = statistics.pstdev(base) or 1e-9
@@ -79,7 +84,7 @@ def detect_level_shift(values: list[float], sensor: str,
             "ewma", sensor, s, e,
             "critical" if e - s > 120 else "warning",
             f"EWMA가 기준선({mu:.1f}) + {k}σ 관리한계({upper:.1f})를 "
-            f"{e - s}분간 초과 — 지속적 수준 이탈"))
+            f"{e - s}{unit}간 초과 — 지속적 수준 이탈"))
     return events
 
 

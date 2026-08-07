@@ -42,8 +42,7 @@ def simulate(machine_id: str = "PUMP-01", hours: int = 48,
              seed: int = 42, inject: bool = True) -> MachineData:
     """정상 운전 + (선택) 결함 주입 시계열 생성."""
     rng = random.Random(seed)
-    n = hours * 60 // (SAMPLE_INTERVAL_SEC // 60) // 1  # 분 단위 샘플 수
-    n = hours * 60  # 1분 간격
+    n = hours * 3600 // SAMPLE_INTERVAL_SEC  # 샘플 수
 
     data = MachineData(machine_id=machine_id)
 

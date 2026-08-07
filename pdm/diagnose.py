@@ -6,6 +6,7 @@ LLM은 탐지 근거를 종합해 사람이 읽을 진단(원인 추정·심각�
 그대로 전달하고, 근거에 없는 내용은 쓰지 말도록 프롬프트를 제한한다.
 """
 import json
+import os
 import statistics
 
 import httpx
@@ -13,8 +14,8 @@ import httpx
 from .detectors import AnomalyEvent
 from .simulator import MachineData
 
-OLLAMA_URL = "http://localhost:11434/v1/chat/completions"
-MODEL = "qwen2.5:3b"
+OLLAMA_URL = os.getenv("PDM_LLM_URL", "http://localhost:11434/v1/chat/completions")
+MODEL = os.getenv("PDM_LLM_MODEL", "qwen2.5:3b")
 
 PROMPT = """당신은 회전기계 예지보전 엔지니어입니다.
 아래 설비의 센서 요약과 이상 탐지 결과를 근거로 진단 리포트를 작성하세요.

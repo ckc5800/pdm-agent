@@ -7,8 +7,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from pdm.cmapss import SENSORS, normalize, regime_stats  # noqa: E402
 from pdm.evaluate import (  # noqa: E402
-    calibrate_limits, engine_alarm, estimate_rul_exp, estimate_rul_linear,
-    health_index, nasa_score,
+    BASELINE, TREND_WIN, calibrate_limits, constant_baseline_mae, engine_alarm,
+    estimate_rul, estimate_rul_exp, estimate_rul_linear, health_index,
+    nasa_score,
 )
 
 
@@ -73,6 +74,42 @@ def test_nasa_score_asymmetry():
     """늦은 예측(+d)이 이른 예측(-d)보다 무겁게 벌점된다. 정확하면 0."""
     assert nasa_score([0.0]) == 0.0
     assert nasa_score([10.0]) > nasa_score([-10.0]) > 0
+
+
+def _exp_series(length: int, b: float = 0.05, base_n: int = BASELINE):
+    """앞 base_n은 평탄, 이후 편차가 exp(b·t)로 커지는 깨끗한 열화 곡선."""
+    flat = [10.0 + (0.01 if i % 2 else -0.01) for i in range(base_n)]
+    return flat + [10.0 + math.exp(b * (i - base_n)) for i in range(base_n, length)]
+
+
+def test_window_guard_blocks_overlapping_baseline():
+    """기준선과 회귀 구간이 겹치는 짧은 시계열은 아예 시도하지 않는다.
+
+    겹치면 기준선 평균이 회귀 구간에 끌려가 편차가 0 근처로 눌리고,
+    아무리 깨끗한 지수 열화라도 근거 없이 보류된다. 같은 곡선이라도
+    창이 분리될 만큼 길면 답해야 한다.
+    """
+    short = _exp_series(BASELINE + TREND_WIN - 1)
+    long = _exp_series(BASELINE + TREND_WIN + 20)
+    limits = {"s": 10.0 + math.exp(0.05 * 100)}
+    assert estimate_rul({"s": short}, len(short), limits, "exp") is None
+    assert estimate_rul({"s": long}, len(long), limits, "exp") is not None
+
+
+def test_min_sensors_requires_corroboration():
+    """뒷받침 센서가 요구치에 못 미치면 보류한다 (경보의 VOTES와 같은 발상)."""
+    limits = {"a": 10.0 + math.exp(0.05 * 100), "b": 99.0}
+    eng = {"a": _exp_series(80), "b": [5.0] * 80}   # b는 평탄 → 기여 못 함
+    assert estimate_rul(eng, 80, limits, "exp", min_sensors=1) is not None
+    assert estimate_rul(eng, 80, limits, "exp", min_sensors=2) is None
+
+
+def test_constant_baseline_mae():
+    """라벨 중앙값을 항상 답하는 예측기의 MAE. 라벨이 모두 같으면 0."""
+    assert constant_baseline_mae([10, 10, 10]) == 0.0
+    # 중앙값 20 → 오차 10, 0, 10 → 평균 20/3
+    assert abs(constant_baseline_mae([10, 20, 30]) - 20 / 3) < 1e-9
+    assert constant_baseline_mae([]) is None
 
 
 def _row(val: float) -> dict[str, float]:

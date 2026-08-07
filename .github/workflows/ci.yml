@@ -10,5 +10,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install pytest
+      - run: pip install -r requirements-dev.txt
       - run: pytest -q
+      # 시뮬레이터 → 탐지기 CLI 스모크 (LLM 불필요)
+      - run: python eval.py
