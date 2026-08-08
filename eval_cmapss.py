@@ -35,10 +35,11 @@ from pdm.cmapss import (
     SENSORS, UNSIGNED_ALL, apply_signs, load, load_rows, normalize,
     regime_stats, select_sensors,
 )
+from pdm.filters import SMOOTHERS
 from pdm.evaluate import (
     CHECKPOINTS, MIN_SENSORS, SENSOR_MODELS, TREND_WIN, BASELINE, VOTES,
     calibrate_limits, constant_baseline_mae, engine_alarm, estimate_rul,
-    health_index, nasa_score, smooth_engines,
+    health_index, nasa_score, normalize_per_engine, smooth_engines,
 )
 
 RAW = Path("data/raw/cmapss")
@@ -56,7 +57,8 @@ def fuse_all(engines: dict[int, dict]) -> dict[int, dict]:
 
 def eval_train(fd: str, k: float, model: str, fuse: bool,
                min_sensors: int = MIN_SENSORS, select: bool = False,
-               smooth: int = 1) -> dict:
+               smooth: int = 1, method: str = "ma", despike: bool = False,
+               norm_engine: bool = False) -> dict:
     # 센서 선택을 데이터로 할 때는 21개를 부호 없이 읽어 보정 엔진에서 고른다.
     picker = UNSIGNED_ALL if select else None
     if fd in MULTI_REGIME:
@@ -75,7 +77,9 @@ def eval_train(fd: str, k: float, model: str, fuse: bool,
     sensors = select_sensors(engines, calib) if select else dict(SENSORS)
     if select:
         engines = apply_signs(engines, sensors)
-    engines = smooth_engines(engines, smooth)
+    if norm_engine:
+        engines = normalize_per_engine(engines, BASELINE)
+    engines = smooth_engines(engines, smooth, method, despike)
 
     votes = VOTES
     if fuse:
@@ -108,7 +112,9 @@ def eval_train(fd: str, k: float, model: str, fuse: bool,
     return {
         "dataset": fd, "split": "train", "k": k, "rul_model": model,
         "fused": fuse, "regimes": regimes,
-        "smooth": smooth, "sensor_selection": "data" if select else "fixed",
+        "smooth": smooth, "smooth_method": method, "despike": despike,
+        "normalize_per_engine": norm_engine,
+        "sensor_selection": "data" if select else "fixed",
         "sensors": sorted(sensors),
         "engines_alarm": len(alarm_units), "engines_rul": len(evalu),
         "life_range": [min(lives.values()), max(lives.values())],
@@ -125,7 +131,8 @@ def eval_train(fd: str, k: float, model: str, fuse: bool,
 
 def eval_test(fd: str, model: str, fuse: bool,
               min_sensors: int = MIN_SENSORS, select: bool = False,
-              smooth: int = 1) -> dict:
+              smooth: int = 1, method: str = "ma", despike: bool = False,
+              norm_engine: bool = False) -> dict:
     """공식 test 셋 RUL 평가. 경보를 내지 않으므로 k(관리한계)는 쓰이지 않는다."""
     labels = [int(x) for x in (RAW / f"RUL_{fd}.txt").read_text().split()]
     picker = UNSIGNED_ALL if select else None
@@ -142,7 +149,11 @@ def eval_test(fd: str, model: str, fuse: bool,
     sensors = select_sensors(train, sorted(train)) if select else dict(SENSORS)
     if select:
         train, test = apply_signs(train, sensors), apply_signs(test, sensors)
-    train, test = smooth_engines(train, smooth), smooth_engines(test, smooth)
+    if norm_engine:
+        train = normalize_per_engine(train, BASELINE)
+        test = normalize_per_engine(test, BASELINE)
+    train = smooth_engines(train, smooth, method, despike)
+    test = smooth_engines(test, smooth, method, despike)
 
     if fuse:
         train, test = fuse_all(train), fuse_all(test)
@@ -186,7 +197,9 @@ def eval_test(fd: str, model: str, fuse: bool,
     return {
         "dataset": fd, "split": "test", "rul_model": model,
         "fused": fuse, "engines": n,
-        "smooth": smooth, "sensor_selection": "data" if select else "fixed",
+        "smooth": smooth, "smooth_method": method, "despike": despike,
+        "normalize_per_engine": norm_engine,
+        "sensor_selection": "data" if select else "fixed",
         "sensors": sorted(sensors),
         "true_rul_range": [min(labels), max(labels)],
         "answered": ans, "coverage_pct": round(100 * ans / n, 1),
@@ -221,12 +234,20 @@ def main():
                     help="센서를 고정 목록 대신 보정 엔진에서 데이터로 선택")
     ap.add_argument("--smooth", type=int, default=1, metavar="N",
                     help="추세 적합 전 후행 이동평균 창 크기 (1=평활 없음)")
+    ap.add_argument("--smooth-method", choices=sorted(SMOOTHERS), default="ma",
+                    dest="method", help="평활 필터 종류 (전부 후행/causal)")
+    ap.add_argument("--despike", action="store_true",
+                    help="평활 전에 Hampel 이상치 제거를 먼저 적용")
+    ap.add_argument("--normalize-engine", action="store_true",
+                    dest="norm_engine",
+                    help="엔진별 초기 구간 z-정규화로 개체차 제거")
     ap.add_argument("--split", choices=["train", "test"], default="train")
     args = ap.parse_args()
 
     if args.split == "train":
         s = eval_train(args.fd, args.k, args.model, args.fuse, args.min_sensors,
-                       args.select, args.smooth)
+                       args.select, args.smooth, args.method, args.despike,
+                       args.norm_engine)
         print(f"{args.fd} train 프로토콜 (k={args.k}, {args.model}"
               f"{', fused' if args.fuse else ''})")
         lead = s["lead_time_median"]
@@ -239,7 +260,8 @@ def main():
                   f"MAE {r['mae_cycles']} 사이클, 중앙값 오차 {r['median_abs_err']}")
     else:
         s = eval_test(args.fd, args.model, args.fuse, args.min_sensors,
-                      args.select, args.smooth)
+                      args.select, args.smooth, args.method, args.despike,
+                      args.norm_engine)
         print(f"{args.fd} 공식 test 셋 ({args.model}"
               f"{', fused' if args.fuse else ''})")
         print(f"엔진 {s['engines']}대 (실제 RUL {s['true_rul_range'][0]}~"
@@ -270,7 +292,9 @@ def main():
         stem += f"-k{args.k}"
     name = (f"{stem}-{args.model}{'-fuse' if args.fuse else ''}"
             f"{'-sel' if args.select else ''}"
-            f"{f'-sm{args.smooth}' if args.smooth > 1 else ''}.json")
+            f"{f'-{args.method}{args.smooth}' if args.smooth > 1 else ''}"
+            f"{'-dsp' if args.despike else ''}"
+            f"{'-ne' if args.norm_engine else ''}.json")
     out_path = OUT / name
     out_path.write_text(json.dumps(s, indent=2))
     print(f"\n저장: {out_path}")

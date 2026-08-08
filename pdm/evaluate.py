@@ -7,6 +7,9 @@ import math
 import statistics
 
 from .detectors import detect_level_shift, linreg_slope
+from .filters import (  # noqa: F401  (하위 호환 재수출)
+    moving_average, normalize_per_engine, smooth_engines,
+)
 
 BASELINE = 30      # 경보/정규화 기준선 사이클 수
 VOTES = 2          # 엔진 경보로 인정할 최소 센서 수 (health index는 1)
@@ -34,33 +37,6 @@ def engine_alarm(eng: dict[str, list[float]], k: float,
 
 
 # ── RUL 추정 ──────────────────────────────────────────────────────
-
-def moving_average(values: list[float], window: int) -> list[float]:
-    """후행 이동평균. i번째 값은 i까지의 최근 window개 평균이다.
-
-    반드시 후행(causal)이어야 한다 — 중심 이동평균을 쓰면 t 시점의 평활값이
-    t 이후 관측을 포함하게 되어, "t까지만 보고 추정한다"는 전제가 깨진다.
-    앞부분은 아직 window가 안 차서 있는 만큼만 평균한다.
-    """
-    if window <= 1:
-        return list(values)
-    out, run = [], 0.0
-    for i, v in enumerate(values):
-        run += v
-        if i >= window:
-            run -= values[i - window]
-        out.append(run / min(i + 1, window))
-    return out
-
-
-def smooth_engines(engines: dict[int, dict[str, list[float]]],
-                   window: int) -> dict[int, dict[str, list[float]]]:
-    """모든 유닛·센서에 후행 이동평균 적용."""
-    if window <= 1:
-        return engines
-    return {u: {s: moving_average(v, window) for s, v in eng.items()}
-            for u, eng in engines.items()}
-
 
 def _window_ok(upto: int) -> bool:
     """기준선 구간과 회귀 구간이 겹치지 않아야 추정을 시도한다.

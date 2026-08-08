@@ -6,6 +6,9 @@
   "fused": false,
   "regimes": null,
   "smooth": 1,
+  "smooth_method": "ma",
+  "despike": false,
+  "normalize_per_engine": false,
   "sensor_selection": "fixed",
   "sensors": [
     "s11",

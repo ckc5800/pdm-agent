@@ -1,17 +1,18 @@
 {
-  "dataset": "FD003",
+  "dataset": "FD001",
   "split": "train",
   "k": 3.0,
   "rul_model": "exp",
   "fused": false,
   "regimes": null,
   "smooth": 5,
-  "sensor_selection": "data",
+  "smooth_method": "ma",
+  "despike": false,
+  "normalize_per_engine": false,
+  "sensor_selection": "fixed",
   "sensors": [
     "s11",
     "s12",
-    "s13",
-    "s14",
     "s15",
     "s17",
     "s2",
@@ -19,29 +20,27 @@
     "s21",
     "s3",
     "s4",
-    "s7",
-    "s8",
-    "s9"
+    "s7"
   ],
   "engines_alarm": 100,
   "engines_rul": 50,
   "life_range": [
-    145,
-    525
+    128,
+    362
   ],
   "detected_before_failure": 100,
-  "lead_time_median": 100.0,
+  "lead_time_median": 71.5,
   "premature_alarms_first30pct": 0,
   "rul": {
     "30": {
       "evaluated": 50,
-      "mae_cycles": 6.6,
-      "median_abs_err": 6.8
+      "mae_cycles": 6.7,
+      "median_abs_err": 6.6
     },
     "50": {
       "evaluated": 50,
-      "mae_cycles": 9.0,
-      "median_abs_err": 7.2
+      "mae_cycles": 14.8,
+      "median_abs_err": 11.6
     }
   }
 }
