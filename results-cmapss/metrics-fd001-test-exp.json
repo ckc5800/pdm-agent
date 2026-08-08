@@ -4,6 +4,20 @@
   "rul_model": "exp",
   "fused": false,
   "engines": 100,
+  "smooth": 1,
+  "sensor_selection": "fixed",
+  "sensors": [
+    "s11",
+    "s12",
+    "s15",
+    "s17",
+    "s2",
+    "s20",
+    "s21",
+    "s3",
+    "s4",
+    "s7"
+  ],
   "true_rul_range": [
     7,
     145

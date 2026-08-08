@@ -5,11 +5,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from pdm.cmapss import SENSORS, normalize, regime_stats  # noqa: E402
+from pdm.cmapss import (  # noqa: E402
+    SENSORS, apply_signs, normalize, regime_stats, select_sensors,
+)
 from pdm.evaluate import (  # noqa: E402
     BASELINE, TREND_WIN, calibrate_limits, constant_baseline_mae, engine_alarm,
     estimate_rul, estimate_rul_exp, estimate_rul_linear, health_index,
-    nasa_score,
+    moving_average, nasa_score,
 )
 
 
@@ -110,6 +112,42 @@ def test_constant_baseline_mae():
     # 중앙값 20 → 오차 10, 0, 10 → 평균 20/3
     assert abs(constant_baseline_mae([10, 20, 30]) - 20 / 3) < 1e-9
     assert constant_baseline_mae([]) is None
+
+
+def test_moving_average_values():
+    """후행 평균: 창이 차기 전에는 있는 만큼만, 이후에는 최근 w개 평균."""
+    assert moving_average([1, 2, 3, 4], 1) == [1, 2, 3, 4]
+    # w=2 → [1, (1+2)/2, (2+3)/2, (3+4)/2]
+    assert moving_average([1, 2, 3, 4], 2) == [1.0, 1.5, 2.5, 3.5]
+
+
+def test_moving_average_is_causal():
+    """미래 값을 바꿔도 이전 시점의 평활값은 변하지 않아야 한다.
+
+    중심 이동평균을 쓰면 이 성질이 깨져 't까지만 보고 추정한다'는
+    평가 전제가 무너진다.
+    """
+    a = moving_average([1.0] * 10, 5)
+    b = moving_average([1.0] * 9 + [999.0], 5)
+    assert a[:9] == b[:9]
+    assert a[9] != b[9]
+
+
+def test_select_sensors_picks_trending_and_signs():
+    """상승/하강 센서는 부호와 함께 뽑고, 평탄·잡음 센서는 버린다."""
+    up = [float(i) for i in range(50)]
+    down = [float(-i) for i in range(50)]
+    flat = [1.0 + (0.5 if i % 2 else -0.5) for i in range(50)]
+    engines = {1: {"up": up, "down": down, "flat": flat},
+               2: {"up": up, "down": down, "flat": flat}}
+    picked = select_sensors(engines, [1, 2], min_abs_corr=0.4)
+    assert picked == {"up": +1, "down": -1}
+
+
+def test_apply_signs_flips_and_filters():
+    engines = {1: {"a": [1.0, 2.0], "b": [1.0, 2.0], "c": [9.0, 9.0]}}
+    out = apply_signs(engines, {"a": +1, "b": -1})
+    assert out[1] == {"a": [1.0, 2.0], "b": [-1.0, -2.0]}
 
 
 def _row(val: float) -> dict[str, float]:

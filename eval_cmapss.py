@@ -31,11 +31,14 @@ import math
 import statistics
 from pathlib import Path
 
-from pdm.cmapss import load, load_rows, normalize, regime_stats
+from pdm.cmapss import (
+    SENSORS, UNSIGNED_ALL, apply_signs, load, load_rows, normalize,
+    regime_stats, select_sensors,
+)
 from pdm.evaluate import (
     CHECKPOINTS, MIN_SENSORS, SENSOR_MODELS, TREND_WIN, BASELINE, VOTES,
     calibrate_limits, constant_baseline_mae, engine_alarm, estimate_rul,
-    health_index, nasa_score,
+    health_index, nasa_score, smooth_engines,
 )
 
 RAW = Path("data/raw/cmapss")
@@ -52,19 +55,27 @@ def fuse_all(engines: dict[int, dict]) -> dict[int, dict]:
 
 
 def eval_train(fd: str, k: float, model: str, fuse: bool,
-               min_sensors: int = MIN_SENSORS) -> dict:
+               min_sensors: int = MIN_SENSORS, select: bool = False,
+               smooth: int = 1) -> dict:
+    # 센서 선택을 데이터로 할 때는 21개를 부호 없이 읽어 보정 엔진에서 고른다.
+    picker = UNSIGNED_ALL if select else None
     if fd in MULTI_REGIME:
-        rows = load_rows(RAW / f"train_{fd}.txt")
+        rows = load_rows(RAW / f"train_{fd}.txt", picker)
         units = sorted(rows)
         calib, evalu = units[:len(units) // 2], units[len(units) // 2:]
         stats = regime_stats(rows, calib)
-        engines = normalize(rows, stats)
+        engines = normalize(rows, stats, picker)
         alarm_units, regimes = evalu, len(stats)
     else:
-        engines = load(RAW / f"train_{fd}.txt")
+        engines = load(RAW / f"train_{fd}.txt", picker)
         units = sorted(engines)
         calib, evalu = units[:len(units) // 2], units[len(units) // 2:]
         alarm_units, regimes = units, None
+
+    sensors = select_sensors(engines, calib) if select else dict(SENSORS)
+    if select:
+        engines = apply_signs(engines, sensors)
+    engines = smooth_engines(engines, smooth)
 
     votes = VOTES
     if fuse:
@@ -97,6 +108,8 @@ def eval_train(fd: str, k: float, model: str, fuse: bool,
     return {
         "dataset": fd, "split": "train", "k": k, "rul_model": model,
         "fused": fuse, "regimes": regimes,
+        "smooth": smooth, "sensor_selection": "data" if select else "fixed",
+        "sensors": sorted(sensors),
         "engines_alarm": len(alarm_units), "engines_rul": len(evalu),
         "life_range": [min(lives.values()), max(lives.values())],
         "detected_before_failure": detected,
@@ -111,17 +124,25 @@ def eval_train(fd: str, k: float, model: str, fuse: bool,
 
 
 def eval_test(fd: str, model: str, fuse: bool,
-              min_sensors: int = MIN_SENSORS) -> dict:
+              min_sensors: int = MIN_SENSORS, select: bool = False,
+              smooth: int = 1) -> dict:
     """공식 test 셋 RUL 평가. 경보를 내지 않으므로 k(관리한계)는 쓰이지 않는다."""
     labels = [int(x) for x in (RAW / f"RUL_{fd}.txt").read_text().split()]
+    picker = UNSIGNED_ALL if select else None
     if fd in MULTI_REGIME:
-        rows_tr = load_rows(RAW / f"train_{fd}.txt")
+        rows_tr = load_rows(RAW / f"train_{fd}.txt", picker)
         stats = regime_stats(rows_tr, sorted(rows_tr))
-        train = normalize(rows_tr, stats)
-        test = normalize(load_rows(RAW / f"test_{fd}.txt"), stats)
+        train = normalize(rows_tr, stats, picker)
+        test = normalize(load_rows(RAW / f"test_{fd}.txt", picker), stats, picker)
     else:
-        train = load(RAW / f"train_{fd}.txt")
-        test = load(RAW / f"test_{fd}.txt")
+        train = load(RAW / f"train_{fd}.txt", picker)
+        test = load(RAW / f"test_{fd}.txt", picker)
+
+    # 센서 선택은 train 전체에서 — test는 건드리지 않으므로 누수가 아니다.
+    sensors = select_sensors(train, sorted(train)) if select else dict(SENSORS)
+    if select:
+        train, test = apply_signs(train, sensors), apply_signs(test, sensors)
+    train, test = smooth_engines(train, smooth), smooth_engines(test, smooth)
 
     if fuse:
         train, test = fuse_all(train), fuse_all(test)
@@ -165,6 +186,8 @@ def eval_test(fd: str, model: str, fuse: bool,
     return {
         "dataset": fd, "split": "test", "rul_model": model,
         "fused": fuse, "engines": n,
+        "smooth": smooth, "sensor_selection": "data" if select else "fixed",
+        "sensors": sorted(sensors),
         "true_rul_range": [min(labels), max(labels)],
         "answered": ans, "coverage_pct": round(100 * ans / n, 1),
         "answered_true_rul_median": statistics.median(answered_true) if answered_true else None,
@@ -194,11 +217,16 @@ def main():
     ap.add_argument("--min-sensors", type=int, default=MIN_SENSORS,
                     dest="min_sensors",
                     help="RUL 추정에 요구할 최소 근거 센서 수 (융합 시 무의미)")
+    ap.add_argument("--select-sensors", action="store_true", dest="select",
+                    help="센서를 고정 목록 대신 보정 엔진에서 데이터로 선택")
+    ap.add_argument("--smooth", type=int, default=1, metavar="N",
+                    help="추세 적합 전 후행 이동평균 창 크기 (1=평활 없음)")
     ap.add_argument("--split", choices=["train", "test"], default="train")
     args = ap.parse_args()
 
     if args.split == "train":
-        s = eval_train(args.fd, args.k, args.model, args.fuse, args.min_sensors)
+        s = eval_train(args.fd, args.k, args.model, args.fuse, args.min_sensors,
+                       args.select, args.smooth)
         print(f"{args.fd} train 프로토콜 (k={args.k}, {args.model}"
               f"{', fused' if args.fuse else ''})")
         lead = s["lead_time_median"]
@@ -210,7 +238,8 @@ def main():
             print(f"RUL@고장 {cp}사이클 전: 평가 {r['evaluated']}/{s['engines_rul']}대, "
                   f"MAE {r['mae_cycles']} 사이클, 중앙값 오차 {r['median_abs_err']}")
     else:
-        s = eval_test(args.fd, args.model, args.fuse, args.min_sensors)
+        s = eval_test(args.fd, args.model, args.fuse, args.min_sensors,
+                      args.select, args.smooth)
         print(f"{args.fd} 공식 test 셋 ({args.model}"
               f"{', fused' if args.fuse else ''})")
         print(f"엔진 {s['engines']}대 (실제 RUL {s['true_rul_range'][0]}~"
@@ -239,7 +268,9 @@ def main():
     stem = f"metrics-{s['dataset'].lower()}-{args.split}"
     if args.split == "train":
         stem += f"-k{args.k}"
-    name = f"{stem}-{args.model}{'-fuse' if args.fuse else ''}.json"
+    name = (f"{stem}-{args.model}{'-fuse' if args.fuse else ''}"
+            f"{'-sel' if args.select else ''}"
+            f"{f'-sm{args.smooth}' if args.smooth > 1 else ''}.json")
     out_path = OUT / name
     out_path.write_text(json.dumps(s, indent=2))
     print(f"\n저장: {out_path}")
