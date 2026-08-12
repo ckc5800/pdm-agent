@@ -43,16 +43,35 @@ def sensor_summary(data: MachineData) -> dict:
     }
 
 
-def diagnose(data: MachineData, events: list[AnomalyEvent],
-             timeout: float = 300.0) -> str:
+def build_evidence(data: MachineData, events: list[AnomalyEvent]) -> str:
+    """LLM에 전달하는 근거 텍스트 전문 (센서 요약 + 탐지 이벤트).
+
+    접지 검사가 '모델이 실제로 본 수치'와 대조해야 하므로, 프롬프트 조립과
+    검사가 같은 문자열을 쓰도록 여기 한 곳에서 만든다.
+    """
     ev_lines = "\n".join(
         f"- [{e.severity}] {e.sensor} ({e.start_idx}~{e.end_idx}분, {e.detector}): {e.evidence}"
         for e in events) or "- 이상 없음"
-    prompt = PROMPT.format(
+    summary = json.dumps(sensor_summary(data), ensure_ascii=False)
+    # 설비 ID도 프롬프트에 들어가므로 근거에 포함한다 (검사 대상과 일치시킨다)
+    return (f"설비: {data.machine_id}\n센서 요약: {summary}\n"
+            f"이상 탐지 결과:\n{ev_lines}")
+
+
+def build_prompt(data: MachineData, events: list[AnomalyEvent]) -> str:
+    ev_lines = "\n".join(
+        f"- [{e.severity}] {e.sensor} ({e.start_idx}~{e.end_idx}분, {e.detector}): {e.evidence}"
+        for e in events) or "- 이상 없음"
+    return PROMPT.format(
         machine_id=data.machine_id,
         summary=json.dumps(sensor_summary(data), ensure_ascii=False),
         events=ev_lines,
     )
+
+
+def diagnose(data: MachineData, events: list[AnomalyEvent],
+             timeout: float = 300.0) -> str:
+    prompt = build_prompt(data, events)
     resp = httpx.post(OLLAMA_URL, timeout=timeout, json={
         "model": MODEL,
         "messages": [{"role": "user", "content": prompt}],

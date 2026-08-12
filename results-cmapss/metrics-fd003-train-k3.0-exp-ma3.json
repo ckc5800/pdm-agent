@@ -1,11 +1,11 @@
 {
-  "dataset": "FD001",
+  "dataset": "FD003",
   "split": "train",
   "k": 3.0,
   "rul_model": "exp",
   "fused": false,
   "regimes": null,
-  "smooth": 1,
+  "smooth": 3,
   "smooth_method": "ma",
   "despike": false,
   "normalize_per_engine": false,
@@ -25,36 +25,36 @@
   "engines_alarm": 100,
   "engines_rul": 50,
   "life_range": [
-    128,
-    362
+    145,
+    525
   ],
-  "detected_before_failure": 94,
-  "lead_time_median": 30.5,
+  "detected_before_failure": 100,
+  "lead_time_median": 60.0,
   "premature_alarms_first30pct": 0,
   "alarm_quality": {
-    "actionable": 75,
-    "early": 1,
-    "late": 18,
-    "missed": 6,
-    "actionable_pct": 75.0
-  },
-  "alarm_quality_trivial": {
-    "actionable": 1,
-    "early": 99,
+    "actionable": 92,
+    "early": 8,
     "late": 0,
     "missed": 0,
-    "actionable_pct": 1.0
+    "actionable_pct": 92.0
+  },
+  "alarm_quality_trivial": {
+    "actionable": 0,
+    "early": 100,
+    "late": 0,
+    "missed": 0,
+    "actionable_pct": 0.0
   },
   "rul": {
     "30": {
-      "evaluated": 48,
-      "mae_cycles": 12.9,
-      "median_abs_err": 9.8
+      "evaluated": 50,
+      "mae_cycles": 8.8,
+      "median_abs_err": 8.4
     },
     "50": {
-      "evaluated": 35,
-      "mae_cycles": 23.4,
-      "median_abs_err": 18.2
+      "evaluated": 49,
+      "mae_cycles": 25.1,
+      "median_abs_err": 13.4
     }
   }
 }

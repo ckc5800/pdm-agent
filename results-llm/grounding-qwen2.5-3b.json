@@ -1,0 +1,203 @@
+{
+  "model": "qwen2.5:3b",
+  "runs": 10,
+  "seeds": [
+    1,
+    7,
+    42,
+    123,
+    2026
+  ],
+  "repeat": 2,
+  "numbers_total": 12,
+  "ungrounded_total": 0,
+  "ungrounded_pct": 0.0,
+  "clean_runs": 10,
+  "clean_run_pct": 100.0,
+  "ungrounded_per_run_max": 0,
+  "ungrounded_per_run_stdev": 0.0,
+  "runs_without_numbers": 6,
+  "sensor_coverage_pct": 100.0,
+  "details": [
+    {
+      "repeat": 0,
+      "seed": 1,
+      "diagnosis": "[PUMP-01 상태 요약]: 진동 센서에서 임계값을 넘어서는 z-score 및 EWMA 경고가 발생하였으며, 온도 센서에서도 임계값을 초과하는 이상이 확인되었습니다. 이러한 현상은 베어링 마모 또는 윤활 불량으로 인한 것으로 추정됩니다.\n\n[이상 징후별 원인 추정]: 진동 센서에서 점진적 상승 및 온도 센서의 동반 상승을 통해 베어링 마모와 윤활 불량에 대한 의심이 제기되었습니다. 이러한 현상은 장기간 유지되는 고온과 높은 진동으로 인해 베어링이 손상될 수 있습니다.\n\n[권고 조치]: PUMP-01을 즉시 정기 점검 및 윤활 작업을 실시하여 베어링 상태를 확인하고, 필요에 따라 교체가 이루어질 것을 권장합니다. 또한, 진동 센서와 온도 센서의 임계값을 다시 설정하여 더 높은 감지 정확성을 유지하는 것이 좋습니다.",
+      "numbers_in_diagnosis": 0,
+      "ungrounded": [],
+      "ungrounded_count": 0,
+      "grounded_pct": null,
+      "sensors_flagged": [
+        "temperature",
+        "vibration"
+      ],
+      "sensors_mentioned": [
+        "temperature",
+        "vibration"
+      ],
+      "coverage_pct": 100.0
+    },
+    {
+      "repeat": 0,
+      "seed": 7,
+      "diagnosis": "[PUMP-01 상태 요약]: 진동 센서에서 임계값을 넘은 z-score와 EWMA가 지속적으로 벗어난 경향이 있으며, 온도 센서에서도 이상이 확인되었습니다.\n\n[이상 징후별 원인 추정]:\n- 진동 증가: 베어링 마모 또는 윤활 불량으로 인해 발생할 수 있습니다.\n- 온도 상승: 부식, 열손상, 혹은 윤활제 부족 등으로 인해 발생할 수 있습니다.\n\n[권고 조치]: \n- 진동 이상을 확인한 경우 즉시 정기 점검 및 필요한 경우 교체를 수행하세요. \n- 온도 이상을 확인한 경우, 적절한 윤활제 사용과 청소 작업을 실시하고, 필요 시 보수 또는 교체가 요구될 수 있습니다.\n- 장시간 지속되는 이상을 관찰하는 동안 추가적인 모니터링이 필요합니다.",
+      "numbers_in_diagnosis": 0,
+      "ungrounded": [],
+      "ungrounded_count": 0,
+      "grounded_pct": null,
+      "sensors_flagged": [
+        "temperature",
+        "vibration"
+      ],
+      "sensors_mentioned": [
+        "temperature",
+        "vibration"
+      ],
+      "coverage_pct": 100.0
+    },
+    {
+      "repeat": 0,
+      "seed": 42,
+      "diagnosis": "[PUMP-01] / [이상 징후별 원인 추정] / [권고 조치]\n\n설비 상태 요약: PUMP-01의 진동 센서와 온도 센서가 이상을 보이고 있습니다. 특히, 진동 센서에서 지속적으로 증가하는 z-score와 EWMA 값이 기준선을 초과한 것으로 나타났습니다. 또한, 온도 센서에서도 지속적인 상승 추세를 보입니다.\n\n이상 징후별 원인 추정: \n- 진동의 점진적 상승은 베어링 마모 또는 윤활 불량을 의심합니다.\n- 온도의 동반 상승은 이에 대한 증거로 볼 수 있습니다. \n\n권고 조치:\n1. PUMP-01을 즉시 정기적인 점검 및 유지보수를 실시하고, 베어링 상태와 윤활 시스템을 확인합니다.\n2. 진동과 온도 데이터를 기록하여 추세 분석을 수행하고, 필요에 따라 추가적인 모니터링이 필요할 경우 조치를 취해야 합니다.\n3. 만약 이상 징후가 지속된다면, PUMP-01의 교체 또는 대체 시스템으로 전환하는 것을 고려해 보세요.",
+      "numbers_in_diagnosis": 3,
+      "ungrounded": [],
+      "ungrounded_count": 0,
+      "grounded_pct": 100.0,
+      "sensors_flagged": [
+        "temperature",
+        "vibration"
+      ],
+      "sensors_mentioned": [
+        "temperature",
+        "vibration"
+      ],
+      "coverage_pct": 100.0
+    },
+    {
+      "repeat": 0,
+      "seed": 123,
+      "diagnosis": "[PUMP-01 상태 요약]: 진동 센서에서 z-score와 EWMA 이상 탐지가 발생하며, 온도 센서에서도 지속적인 이상이 감지되었습니다. \n\n[이상 징후별 원인 추정]: \n- 진동 증가: 베어링 마모 또는 윤활 불량으로 인해 발생할 가능성이 높습니다.\n- 온도 상승: 동일한 원인이 영향을 미치고 있으며, 이는 열 손실이나 부식 등이 될 수 있습니다.\n\n[권고 조치]: \n- 진동 이상 탐지 시점부터 27시간 후까지 베어링 및 윤활 시스템 검사를 실시하고, 필요에 따라 교체가 이루어져야 합니다.\n- 온도 이상 탐지 시점부터 162분 후까지는 즉각적인 보수 조치를 취하여 열 손실을 줄이고 부식을 방지해야 합니다.",
+      "numbers_in_diagnosis": 2,
+      "ungrounded": [],
+      "ungrounded_count": 0,
+      "grounded_pct": 100.0,
+      "sensors_flagged": [
+        "temperature",
+        "vibration"
+      ],
+      "sensors_mentioned": [
+        "temperature",
+        "vibration"
+      ],
+      "coverage_pct": 100.0
+    },
+    {
+      "repeat": 0,
+      "seed": 2026,
+      "diagnosis": "[PUMP-01 상태 요약]: 진동 센서에서 임계값을 넘어서는 z-score와 EWMA 경고가 발생했으며, 온도 센서에서도 지속적인 이상이 감지되었습니다. \n\n[이상 징후별 원인 추정]: \n- 진동 증가: 베어링 마모 또는 윤활 불량을 의심합니다.\n- 온도 상승: 열 발생 부품의 문제, 윤활유의 성능 저하 등으로 인해 발생할 수 있습니다.\n\n[권고 조치]: \n- 현재 상태에서 베어링 및 윤활 유를 체크하고 교체가 필요한지 확인합니다.\n- 온도 센서로 인한 이상을 확인하여 열 발생 부품의 문제를 검토합니다. \n- 정기적인 유지보수와 점검을 수행하여 예방적 관리에 집중합니다.",
+      "numbers_in_diagnosis": 0,
+      "ungrounded": [],
+      "ungrounded_count": 0,
+      "grounded_pct": null,
+      "sensors_flagged": [
+        "temperature",
+        "vibration"
+      ],
+      "sensors_mentioned": [
+        "temperature",
+        "vibration"
+      ],
+      "coverage_pct": 100.0
+    },
+    {
+      "repeat": 1,
+      "seed": 1,
+      "diagnosis": "[PUMP-01 상태 요약]: 진동 센서에서 임계값을 넘은 z-score와 EWMA 값이 나타나며, 온도 센서에서도 이상적인 범위를 벗어난 값이 지속적으로 관찰되었습니다. 이는 베어링 마모 또는 윤활 불량에 대한 의심을 불러일으킵니다.\n\n[이상 징후별 원인 추정]: 진동 데이터에서 임계값을 넘은 z-score와 EWMA가 나타나며, 점진적 상승과 온도 센서의 이상적인 범위를 벗어난 값은 베어링 마모 또는 윤활 불량에 대한 의심을 불러일으킵니다. 또한, 온도 데이터에서 지속적으로 초과된 값은 윤활 상태가 저하되었거나, 냉각 시스템이 작동하지 않는 등의 문제를 암시합니다.\n\n[권고 조치]: 베어링 및 윤활 시스템을 점검하고 교체할 필요가 있습니다. 또한, 온도 센서의 이상적인 범위를 벗어난 값은 냉각 시스템의 작동 상태를 확인해야 합니다. 이와 관련된 모든 시스템을 철저히 점검하여 문제를 해결하고, 필요한 경우 교체 또는 조정이 필요합니다.",
+      "numbers_in_diagnosis": 0,
+      "ungrounded": [],
+      "ungrounded_count": 0,
+      "grounded_pct": null,
+      "sensors_flagged": [
+        "temperature",
+        "vibration"
+      ],
+      "sensors_mentioned": [
+        "temperature",
+        "vibration"
+      ],
+      "coverage_pct": 100.0
+    },
+    {
+      "repeat": 1,
+      "seed": 7,
+      "diagnosis": "[PUMP-01 상태 요약]: 진동 센서에서 z-score와 EWMA로 임계치를 초과하는 현상이 확인되었고, 온도 센서에서도 임계치를 초과하는 현상이 지속되고 있습니다. 특히 진동의 점진적 상승과 함께 온도가 동반적으로 상승하고 있어 베어링 마모 또는 윤활 불량을 의심할 수 있습니다.\n\n[이상 징후별 원인 추정]: \n- 진동 증가 및 온도 상승은 베어링의 상태 변화를 나타내는 것으로 보입니다. 이는 베어링에 대한 마모나 윤활 부족 등으로 인해 발생할 수 있습니다.\n\n[권고 조치]:\n- 현재 상태에서 베어링과 윤활 시스템을 점검하고, 필요시 교체 또는 정비를 실시해야 합니다.\n- 진동 및 온도 모니터링을 강화하여 예방적 관리가 이루어질 수 있도록 하겠습니다.",
+      "numbers_in_diagnosis": 0,
+      "ungrounded": [],
+      "ungrounded_count": 0,
+      "grounded_pct": null,
+      "sensors_flagged": [
+        "temperature",
+        "vibration"
+      ],
+      "sensors_mentioned": [
+        "temperature",
+        "vibration"
+      ],
+      "coverage_pct": 100.0
+    },
+    {
+      "repeat": 1,
+      "seed": 42,
+      "diagnosis": "[PUMP-01 상태 요약] / [이상 징후별 원인 추정] / [권고 조치]\n\n[PUMP-01 상태 요약]: PUMP-01의 진동 센서에서 4.06의 RMS 값과 온도 센서에서 58.5의 온도가 최근 1시간 평균으로 측정되었습니다. 이상 탐지 결과로, 진동이 점진적으로 상승하고, 동시에 온도가 동반적으로 상승하는 경향을 확인하였습니다.\n\n[이상 징후별 원인 추정]: \n- 진동의 점진적 상승 + 온도 동반 상승은 베어링 마모 또는 윤활 불량을 의심합니다. \n\n[권고 조치]: \nPUMP-01의 현재 상태는 베어링 문제에 대한 우려를 초래하며, 즉각적인 대응이 필요합니다. 우선적으로, PUMP-01에서 발생하는 이상 징후를 확인하고, 진동 센서와 온도 센서의 데이터를 기반으로 정기적인 점검을 실시해야 합니다. 또한, 윤활제 상태를 철저히 점검하여 필요하다면 교체가 이루어져야 합니다. 이러한 조치들이 취해지지 않은 상황에서는 PUMP-01을 즉시 중단하고 보수 작업이 필요할 수 있습니다.",
+      "numbers_in_diagnosis": 3,
+      "ungrounded": [],
+      "ungrounded_count": 0,
+      "grounded_pct": 100.0,
+      "sensors_flagged": [
+        "temperature",
+        "vibration"
+      ],
+      "sensors_mentioned": [
+        "temperature",
+        "vibration"
+      ],
+      "coverage_pct": 100.0
+    },
+    {
+      "repeat": 1,
+      "seed": 123,
+      "diagnosis": "[PUMP-01 상태 요약]: 진동 센서에서 임계값을 넘은 z-score와 EWMA가 나타나며, 온도 센서에서도 이상이 확인되었습니다. 점진적인 진동 증가와 온도 상승 추세는 베어링 마모 또는 윤활 불량을 의심합니다.\n\n[이상 징후별 원인 추정]: \n- 진동: 임계값 넘은 z-score 및 EWMA 지속적 이탈로 인해 베어링 상태가 악화되었을 가능성이 있습니다.\n- 온도: 임계값 이상으로 움직이는 온도 센서는 윤활유의 부족이나 오염, 혹은 베어링에 문제가 있을 수 있습니다.\n\n[권고 조치]: \n1. 진동 및 온도 센서를 다시 점검하고 정기적인 유지보수 작업을 수행합니다.\n2. 윤활 유량과 상태를 확인하여 필요시 교체해야 할 경우 교체합니다.\n3. 베어링 상태를 확인하여 필요한 경우 교체 또는 수리가 필요할 수 있습니다.\n4. 진동 및 온도 모니터링 시스템을 강화하고, 예방적 관리를 위한 데이터 분석을 수행합니다.",
+      "numbers_in_diagnosis": 4,
+      "ungrounded": [],
+      "ungrounded_count": 0,
+      "grounded_pct": 100.0,
+      "sensors_flagged": [
+        "temperature",
+        "vibration"
+      ],
+      "sensors_mentioned": [
+        "temperature",
+        "vibration"
+      ],
+      "coverage_pct": 100.0
+    },
+    {
+      "repeat": 1,
+      "seed": 2026,
+      "diagnosis": "[PUMP-01 상태 요약]: 진동 센서에서 임계치 이상이 감지되었으며, 온도 센서에서도 지속적으로 상승 추세가 관찰되었습니다.\n\n[이상 징후별 원인 추정]: \n- 진동의 점진적 상승과 함께 온도가 동반 상승함으로써 베어링 마모 또는 윤활 불량을 의심합니다. \n\n[권고 조치]: \n- 현재 상태를 확인하고, 즉시 정기적인 유지보수를 수행하여 베어링 및 윤활 시스템의 상태를 점검해야 합니다. 또한, 진동과 온도 데이터를 계속 모니터링하여 이상이 발생하지 않도록 하세요.",
+      "numbers_in_diagnosis": 0,
+      "ungrounded": [],
+      "ungrounded_count": 0,
+      "grounded_pct": null,
+      "sensors_flagged": [
+        "temperature",
+        "vibration"
+      ],
+      "sensors_mentioned": [
+        "temperature",
+        "vibration"
+      ],
+      "coverage_pct": 100.0
+    }
+  ]
+}

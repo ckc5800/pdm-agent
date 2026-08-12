@@ -36,6 +36,55 @@ def engine_alarm(eng: dict[str, list[float]], k: float,
     return firsts[votes - 1] if len(firsts) >= votes else None
 
 
+# ── 경보 품질: 탐지율·리드타임만으로는 부족하다 ──────────────────
+#
+# "고장 전에 울렸나"와 "얼마나 일찍 울렸나"만 재면, 기준선 직후 무조건
+# 경보하는 예측기가 탐지율 100%에 최대 리드타임을 받는다. 그건 경보가
+# 아니라 상수 출력이다. 남은 수명을 얼마나 낭비하는지까지 봐야 한다.
+
+ACTIONABLE_MIN = 20    # 정비 일정을 잡는 데 필요한 최소 예고 사이클
+ACTIONABLE_MAX = 100   # 이보다 이르면 멀쩡한 잔여 수명을 버리게 된다
+
+
+def classify_alarm(alarm: int | None, life: int,
+                   lo: int = ACTIONABLE_MIN, hi: int = ACTIONABLE_MAX) -> str:
+    """경보 하나를 운용 관점에서 분류한다.
+
+    missed     — 고장까지 한 번도 울리지 않음
+    late       — 울렸으나 예고가 lo 미만이라 정비 일정을 잡을 수 없음
+    actionable — 예고가 [lo, hi] 안 (쓸모 있는 경보)
+    early      — 예고가 hi 초과. 고장은 맞혔지만 남은 수명을 버린다
+    """
+    if alarm is None:
+        return "missed"
+    rul = life - alarm
+    if rul < lo:
+        return "late"
+    if rul > hi:
+        return "early"
+    return "actionable"
+
+
+def alarm_quality(alarms: dict[int, int | None], lives: dict[int, int],
+                  lo: int = ACTIONABLE_MIN, hi: int = ACTIONABLE_MAX) -> dict:
+    """경보 집합을 운용 관점 4분류로 집계."""
+    counts = {"actionable": 0, "early": 0, "late": 0, "missed": 0}
+    for u, alarm in alarms.items():
+        counts[classify_alarm(alarm, lives[u], lo, hi)] += 1
+    n = len(alarms) or 1
+    return {**counts, "actionable_pct": round(100 * counts["actionable"] / n, 1)}
+
+
+def trivial_alarms(units: list[int], baseline_n: int = BASELINE
+                   ) -> dict[int, int]:
+    """자명한 대조군 — 기준선이 끝나자마자 전 엔진에 경보.
+
+    탐지율 100%에 리드타임 최대를 받으므로, 탐지율·리드타임만 보는 지표가
+    실제 경보 능력을 재고 있는지 판별하는 기준선이 된다.
+    """
+    return {u: baseline_n for u in units}
+
+
 # ── RUL 추정 ──────────────────────────────────────────────────────
 
 def _window_ok(upto: int) -> bool:
@@ -171,6 +220,17 @@ def nasa_score(errors: list[float]) -> float:
     """
     return sum(math.exp(-d / 13) - 1 if d < 0 else math.exp(d / 10) - 1
                for d in errors)
+
+
+def survival_baseline_rul(elapsed: int, typical_life: float,
+                          cap: float = 125.0) -> float:
+    """센서를 전혀 보지 않고 경과 사이클만으로 RUL을 예측한다.
+
+    RUL = (train 엔진 수명 중앙값 − 경과 사이클). 상수 대조군보다 훨씬 강한
+    기준선이다 — 엔진이 얼마나 오래 돌았는지만 알아도 이 정도는 맞힌다.
+    센서 기반 추정이 이것을 못 이긴다면 센서를 읽는 의미가 없다.
+    """
+    return max(0.0, min(typical_life - elapsed, cap))
 
 
 def constant_baseline_mae(labels: list[float]) -> float | None:

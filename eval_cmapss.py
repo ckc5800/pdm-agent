@@ -37,9 +37,11 @@ from pdm.cmapss import (
 )
 from pdm.filters import SMOOTHERS
 from pdm.evaluate import (
-    CHECKPOINTS, MIN_SENSORS, SENSOR_MODELS, TREND_WIN, BASELINE, VOTES,
-    calibrate_limits, constant_baseline_mae, engine_alarm, estimate_rul,
-    health_index, nasa_score, normalize_per_engine, smooth_engines,
+    ACTIONABLE_MAX, ACTIONABLE_MIN, CHECKPOINTS, MIN_SENSORS, SENSOR_MODELS,
+    TREND_WIN, BASELINE, VOTES,
+    alarm_quality, calibrate_limits, constant_baseline_mae, engine_alarm,
+    estimate_rul, health_index, nasa_score, normalize_per_engine,
+    smooth_engines, survival_baseline_rul, trivial_alarms,
 )
 
 RAW = Path("data/raw/cmapss")
@@ -87,15 +89,18 @@ def eval_train(fd: str, k: float, model: str, fuse: bool,
     lives = {u: series_len(engines[u]) for u in units}
 
     # ── 경보: 고장 전에 울렸는가 ──
+    alarms = {u: engine_alarm(engines[u], k, votes=votes) for u in alarm_units}
     detected, lead_times, premature = 0, [], 0
-    for u in alarm_units:
-        alarm = engine_alarm(engines[u], k, votes=votes)
+    for u, alarm in alarms.items():
         if alarm is None:
             continue
         detected += 1
         lead_times.append(lives[u] - alarm)
         if alarm < lives[u] * 0.3:
             premature += 1
+    quality = alarm_quality(alarms, lives)
+    # 자명한 대조군: 기준선 직후 전 엔진 경보 → 탐지율 100%, 리드타임 최대
+    trivial = alarm_quality(trivial_alarms(alarm_units), lives)
 
     # ── RUL: 보정/평가 엔진 분리 (라벨 누수 차단) ──
     limits = calibrate_limits(engines, calib)
@@ -121,6 +126,8 @@ def eval_train(fd: str, k: float, model: str, fuse: bool,
         "detected_before_failure": detected,
         "lead_time_median": statistics.median(lead_times) if lead_times else None,
         "premature_alarms_first30pct": premature,
+        "alarm_quality": quality,
+        "alarm_quality_trivial": trivial,
         "rul": {str(cp): {
             "evaluated": len(errs),
             "mae_cycles": round(statistics.fmean(errs), 1) if errs else None,
@@ -166,13 +173,19 @@ def eval_test(fd: str, model: str, fuse: bool,
         raise ValueError(
             f"{fd}: test 엔진 {len(units)}대 vs RUL 라벨 {len(labels)}개 — 불일치")
 
+    # 생존시간 대조군용: train 엔진 수명 중앙값 (test 라벨을 쓰지 않는다)
+    typical_life = statistics.median(series_len(e) for e in train.values())
+
     sensor_fn = SENSOR_MODELS[model]
     errors, errors_cap, answered_true, support = [], [], [], []
+    survival_errors = []
     for i, u in enumerate(units):
         upto = series_len(test[u])
         est = estimate_rul(test[u], upto, limits, model, min_sensors)
         if est is None:
             continue
+        survival_errors.append(
+            survival_baseline_rul(upto, typical_life) - labels[i])
         errors.append(est - labels[i])
         # 문헌 관례: 열화가 보이기 전 구간은 구분 불가하므로 추정치를
         # 125 사이클에 캡 (piecewise-linear RUL 타깃과 같은 발상)
@@ -209,6 +222,11 @@ def eval_test(fd: str, model: str, fuse: bool,
         "constant_baseline_mae": (round(constant_baseline_mae(answered_true), 1)
                                   if answered_true else None),
         "constant_baseline_mae_all_engines": round(constant_baseline_mae(labels), 1),
+        # 더 강한 대조군: 센서를 안 보고 "수명 중앙값 - 경과 사이클"만으로 예측
+        "typical_life": typical_life,
+        "survival_baseline_mae": (
+            round(statistics.fmean(abs(e) for e in survival_errors), 1)
+            if survival_errors else None),
         "sensors_backing_median": statistics.median(support) if support else None,
         "answered_on_one_sensor": sum(1 for c in support if c == 1),
         **stats(errors),
@@ -254,6 +272,12 @@ def main():
         print(f"고장 전 경보: {s['detected_before_failure']}/{s['engines_alarm']}대"
               f" | 리드타임 중앙값 {f'{lead:.0f} 사이클' if lead is not None else '—(경보 없음)'}"
               f" | 수명 초반 30% 내 경보 {s['premature_alarms_first30pct']}대")
+        q, t = s["alarm_quality"], s["alarm_quality_trivial"]
+        print(f"경보 품질 [예고 {ACTIONABLE_MIN}~{ACTIONABLE_MAX}사이클이 유효]: "
+              f"유효 {q['actionable']} / 너무 이름 {q['early']} / "
+              f"예고부족 {q['late']} / 놓침 {q['missed']}  ({q['actionable_pct']}%)")
+        print(f"  [대조군] 기준선 직후 무조건 경보 시: 유효 {t['actionable']} / "
+              f"너무 이름 {t['early']}  ({t['actionable_pct']}%)")
         for cp in CHECKPOINTS:
             r = s["rul"][str(cp)]
             print(f"RUL@고장 {cp}사이클 전: 평가 {r['evaluated']}/{s['engines_rul']}대, "
@@ -279,11 +303,15 @@ def main():
         c = s["cap125"]
         print(f"[추정 125캡] MAE {c['mae_cycles']} | RMSE {c['rmse_cycles']} | "
               f"PHM08 {c['phm08_score']} (엔진당 {c['phm08_per_engine']})")
-        base, base_all = s["constant_baseline_mae"], s["constant_baseline_mae_all_engines"]
-        verdict = "이김" if c["mae_cycles"] < base else "못 이김 ⚠"
-        print(f"[대조군] 같은 응답 집합에 상수(중앙값) 예측 시 MAE {base} "
-              f"→ 추정기 {c['mae_cycles']}: {verdict}"
-              f"  (전체 {s['engines']}대에 상수 적용 시 MAE {base_all})")
+        base, surv = s["constant_baseline_mae"], s["survival_baseline_mae"]
+        mine = c["mae_cycles"]
+        print(f"[대조군] 같은 응답 집합 기준 MAE — 추정기 {mine} vs "
+              f"상수(중앙값) {base} [{'이김' if mine < base else '못 이김 ⚠'}] vs "
+              f"생존시간(수명중앙값-경과) {surv} "
+              f"[{'이김' if mine < surv else '못 이김 ⚠'}]")
+        print(f"          (전체 {s['engines']}대에 상수 적용 시 MAE "
+              f"{s['constant_baseline_mae_all_engines']}, "
+              f"train 수명 중앙값 {s['typical_life']:.0f})")
 
     OUT.mkdir(exist_ok=True)
     # k는 경보 지표에만 영향을 주므로 test 결과 파일명에는 넣지 않는다

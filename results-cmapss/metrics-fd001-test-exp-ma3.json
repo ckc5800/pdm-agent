@@ -1,0 +1,48 @@
+{
+  "dataset": "FD001",
+  "split": "test",
+  "rul_model": "exp",
+  "fused": false,
+  "engines": 100,
+  "smooth": 3,
+  "smooth_method": "ma",
+  "despike": false,
+  "normalize_per_engine": false,
+  "sensor_selection": "fixed",
+  "sensors": [
+    "s11",
+    "s12",
+    "s15",
+    "s17",
+    "s2",
+    "s20",
+    "s21",
+    "s3",
+    "s4",
+    "s7"
+  ],
+  "true_rul_range": [
+    7,
+    145
+  ],
+  "answered": 68,
+  "coverage_pct": 68.0,
+  "answered_true_rul_median": 54.5,
+  "constant_baseline_mae": 33.8,
+  "constant_baseline_mae_all_engines": 35.9,
+  "typical_life": 199.0,
+  "survival_baseline_mae": 32.7,
+  "sensors_backing_median": 7.0,
+  "answered_on_one_sensor": 10,
+  "mae_cycles": 22.2,
+  "rmse_cycles": 33.7,
+  "phm08_score": 31741.9,
+  "phm08_per_engine": 466.79,
+  "worst_error_cycles": 102.6,
+  "cap125": {
+    "mae_cycles": 19.3,
+    "rmse_cycles": 29.6,
+    "phm08_score": 2552.9,
+    "phm08_per_engine": 37.54
+  }
+}

@@ -9,9 +9,11 @@ from pdm.cmapss import (  # noqa: E402
     SENSORS, apply_signs, normalize, regime_stats, select_sensors,
 )
 from pdm.evaluate import (  # noqa: E402
-    BASELINE, TREND_WIN, calibrate_limits, constant_baseline_mae, engine_alarm,
-    estimate_rul, estimate_rul_exp, estimate_rul_linear, health_index,
-    moving_average, nasa_score,
+    BASELINE, TREND_WIN, alarm_quality, calibrate_limits, classify_alarm,
+    constant_baseline_mae, engine_alarm, estimate_rul, estimate_rul_exp,
+    estimate_rul_linear, health_index, moving_average, nasa_score,
+    survival_baseline_rul,
+    trivial_alarms,
 )
 
 
@@ -114,23 +116,47 @@ def test_constant_baseline_mae():
     assert constant_baseline_mae([]) is None
 
 
-def test_moving_average_values():
-    """후행 평균: 창이 차기 전에는 있는 만큼만, 이후에는 최근 w개 평균."""
-    assert moving_average([1, 2, 3, 4], 1) == [1, 2, 3, 4]
-    # w=2 → [1, (1+2)/2, (2+3)/2, (3+4)/2]
+def test_survival_baseline_rul():
+    """수명 중앙값 200에서 경과 150 → 50 남았다고 답한다. 음수·캡 처리 포함."""
+    assert survival_baseline_rul(150, 200.0) == 50.0
+    assert survival_baseline_rul(250, 200.0) == 0.0      # 이미 초과 → 0
+    assert survival_baseline_rul(10, 300.0, cap=125) == 125.0   # 캡 적용
+
+
+def test_moving_average_reexported_from_evaluate():
+    """필터 본체는 pdm/filters.py에 있고 evaluate가 재수출한다 (하위 호환)."""
     assert moving_average([1, 2, 3, 4], 2) == [1.0, 1.5, 2.5, 3.5]
 
 
-def test_moving_average_is_causal():
-    """미래 값을 바꿔도 이전 시점의 평활값은 변하지 않아야 한다.
+def test_classify_alarm_bands():
+    """예고 구간에 따라 4분류. 경계값은 유효로 친다."""
+    life = 200
+    assert classify_alarm(None, life) == "missed"
+    assert classify_alarm(190, life) == "late"        # 예고 10 < 20
+    assert classify_alarm(180, life) == "actionable"  # 예고 20 = 하한
+    assert classify_alarm(100, life) == "actionable"  # 예고 100 = 상한
+    assert classify_alarm(99, life) == "early"        # 예고 101 > 100
 
-    중심 이동평균을 쓰면 이 성질이 깨져 't까지만 보고 추정한다'는
-    평가 전제가 무너진다.
+
+def test_trivial_alarm_baseline_is_nearly_all_early():
+    """기준선 직후 무조건 경보 — 탐지율 100%지만 거의 전부 '너무 이름'.
+
+    탐지율·리드타임만 보는 지표는 이 예측기를 만점으로 매긴다. 경보에도
+    자명한 대조군이 필요한 이유다.
     """
-    a = moving_average([1.0] * 10, 5)
-    b = moving_average([1.0] * 9 + [999.0], 5)
-    assert a[:9] == b[:9]
-    assert a[9] != b[9]
+    lives = {u: 200 for u in range(1, 11)}
+    q = alarm_quality(trivial_alarms(list(lives), baseline_n=30), lives)
+    assert q["missed"] == 0            # 전부 '탐지'
+    assert q["early"] == 10            # 그러나 전부 너무 이름
+    assert q["actionable_pct"] == 0.0
+
+
+def test_alarm_quality_counts():
+    lives = {1: 200, 2: 200, 3: 200, 4: 200}
+    alarms = {1: 150, 2: 50, 3: 195, 4: None}   # 유효 / 이름 / 예고부족 / 놓침
+    q = alarm_quality(alarms, lives)
+    assert (q["actionable"], q["early"], q["late"], q["missed"]) == (1, 1, 1, 1)
+    assert q["actionable_pct"] == 25.0
 
 
 def test_select_sensors_picks_trending_and_signs():
