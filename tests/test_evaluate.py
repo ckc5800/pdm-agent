@@ -11,7 +11,8 @@ from pdm.cmapss import (  # noqa: E402
 from pdm.evaluate import (  # noqa: E402
     BASELINE, TREND_WIN, alarm_quality, calibrate_limits, classify_alarm,
     constant_baseline_mae, engine_alarm, estimate_rul, estimate_rul_exp,
-    estimate_rul_linear, health_index, moving_average, nasa_score,
+    estimate_rul_linear, false_alarm_rate, health_index, healthy_prefix_end,
+    moving_average, nasa_score,
     survival_baseline_rul,
     trivial_alarms,
 )
@@ -149,6 +150,42 @@ def test_trivial_alarm_baseline_is_nearly_all_early():
     assert q["missed"] == 0            # 전부 '탐지'
     assert q["early"] == 10            # 그러나 전부 너무 이름
     assert q["actionable_pct"] == 0.0
+
+
+def test_healthy_prefix_end_same_formula_for_both_splits():
+    """잔여 수명 > knee 구간의 끝. train(끝 RUL=0)과 test(끝 RUL=라벨) 공통."""
+    # run-to-failure 200 사이클 → 앞 75 사이클이 잔여수명 125 초과 구간
+    assert healthy_prefix_end(200, 0, knee=125) == 75
+    # 라벨 40으로 절단된 test 엔진 160 사이클 → 160+40-125 = 75
+    assert healthy_prefix_end(160, 40, knee=125) == 75
+    # 이미 knee 안쪽이면 건강 구간이 없다 (음수)
+    assert healthy_prefix_end(100, 0, knee=125) < 0
+
+
+def test_false_alarm_rate_counts_only_healthy_region():
+    """건강 구간에서 울리면 오탐, 그 뒤에서 울리는 것은 세지 않는다."""
+    quiet = [10.0 + (0.05 if i % 2 else -0.05) for i in range(200)]
+    # 건강 구간(앞 75)에서 이탈 → 오탐
+    noisy_early = quiet[:60] + [20.0] * 140
+    # 건강 구간을 지나서 이탈 → 오탐 아님
+    noisy_late = quiet[:150] + [20.0] * 50
+
+    engines = {1: {"a": noisy_early, "b": noisy_early},
+               2: {"a": noisy_late, "b": noisy_late}}
+    fa = false_alarm_rate(engines, {1: 0, 2: 0}, k=3.0)
+    assert fa["evaluated"] == 2
+    assert fa["false_alarms"] == 1
+    assert fa["false_alarm_pct"] == 50.0
+
+
+def test_false_alarm_rate_skips_short_engines_without_hiding_them():
+    """건강 구간이 짧아 판정 불가한 엔진은 분모에서 빼되 개수를 보고한다."""
+    short = [10.0] * 130      # 130-125 = 5 → 최소 요건 미달
+    engines = {1: {"a": short, "b": short}}
+    fa = false_alarm_rate(engines, {1: 0}, k=3.0)
+    assert fa["evaluated"] == 0
+    assert fa["skipped_short"] == 1
+    assert fa["false_alarm_pct"] is None
 
 
 def test_alarm_quality_counts():

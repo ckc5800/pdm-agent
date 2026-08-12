@@ -75,6 +75,62 @@ def alarm_quality(alarms: dict[int, int | None], lives: dict[int, int],
     return {**counts, "actionable_pct": round(100 * counts["actionable"] / n, 1)}
 
 
+# ── 오탐율: 없는 음성 클래스를 만들어낸다 ────────────────────────
+#
+# C-MAPSS는 전 엔진이 고장까지 운전되어 "건강한 채 끝나는" 엔진이 없다.
+# 그래서 지금까지 오탐율을 잴 수 없었고, "수명 초반 30% 내 경보"라는
+# 대리 지표로 때웠다.
+#
+# 그러나 각 엔진의 **앞부분**은 실제로 건강하다. 문헌이 RUL 타깃을
+# piecewise-linear로 두고 knee(관례상 125) 이전을 상수 구간으로 보는 것과
+# 같은 근거다. 잔여 수명이 knee를 넘는 구간만 잘라 탐지기에 넣으면,
+# 거기서 울리는 경보는 정의상 오탐이다. 이렇게 음성 클래스를 구성한다.
+
+HEALTHY_KNEE = 125    # 잔여 수명이 이보다 많으면 아직 열화 전으로 본다
+MIN_HEALTHY_LEN = 45  # 탐지기 최소 요건 (기준선 30 + 지속 필터 10 + 여유)
+
+
+def healthy_prefix_end(series_len: int, rul_at_end: int,
+                       knee: int = HEALTHY_KNEE) -> int:
+    """잔여 수명이 knee를 넘는 구간의 끝 인덱스.
+
+    시점 i의 실제 잔여 수명은 (series_len - i + rul_at_end)이므로,
+    그것이 knee를 넘는 구간은 i < series_len + rul_at_end - knee이다.
+    run-to-failure(train)는 rul_at_end=0, 절단된 test는 라벨을 넣는다 —
+    같은 식이 두 프로토콜에 그대로 적용된다.
+    """
+    return series_len + rul_at_end - knee
+
+
+def false_alarm_rate(engines: dict[int, dict[str, list[float]]],
+                     ruls_at_end: dict[int, int], k: float,
+                     votes: int = VOTES, knee: int = HEALTHY_KNEE,
+                     min_len: int = MIN_HEALTHY_LEN) -> dict:
+    """건강 구간에만 탐지기를 돌려 경보가 울리는 비율 = 오탐율.
+
+    구간이 탐지기 최소 요건보다 짧은 엔진은 판정에서 제외하고 그 수를
+    함께 보고한다(분모를 조용히 바꾸지 않기 위해).
+    """
+    evaluated, false_alarms = 0, 0
+    for u, eng in engines.items():
+        length = len(next(iter(eng.values())))
+        end = healthy_prefix_end(length, ruls_at_end.get(u, 0), knee)
+        if end < min_len:
+            continue
+        evaluated += 1
+        prefix = {s: v[:end] for s, v in eng.items()}
+        if engine_alarm(prefix, k, votes=votes) is not None:
+            false_alarms += 1
+    return {
+        "evaluated": evaluated,
+        "false_alarms": false_alarms,
+        "false_alarm_pct": (round(100 * false_alarms / evaluated, 1)
+                            if evaluated else None),
+        "skipped_short": len(engines) - evaluated,
+        "knee": knee,
+    }
+
+
 def trivial_alarms(units: list[int], baseline_n: int = BASELINE
                    ) -> dict[int, int]:
     """자명한 대조군 — 기준선이 끝나자마자 전 엔진에 경보.

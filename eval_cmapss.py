@@ -40,8 +40,9 @@ from pdm.evaluate import (
     ACTIONABLE_MAX, ACTIONABLE_MIN, CHECKPOINTS, MIN_SENSORS, SENSOR_MODELS,
     TREND_WIN, BASELINE, VOTES,
     alarm_quality, calibrate_limits, constant_baseline_mae, engine_alarm,
-    estimate_rul, health_index, nasa_score, normalize_per_engine,
-    smooth_engines, survival_baseline_rul, trivial_alarms,
+    estimate_rul, false_alarm_rate, health_index, nasa_score,
+    normalize_per_engine, smooth_engines, survival_baseline_rul,
+    trivial_alarms,
 )
 
 RAW = Path("data/raw/cmapss")
@@ -101,6 +102,9 @@ def eval_train(fd: str, k: float, model: str, fuse: bool,
     quality = alarm_quality(alarms, lives)
     # 자명한 대조군: 기준선 직후 전 엔진 경보 → 탐지율 100%, 리드타임 최대
     trivial = alarm_quality(trivial_alarms(alarm_units), lives)
+    # 오탐율: 열화 전 구간(잔여 수명 > knee)만 넣어 울리면 오탐
+    fa = false_alarm_rate({u: engines[u] for u in alarm_units},
+                          {u: 0 for u in alarm_units}, k, votes=votes)
 
     # ── RUL: 보정/평가 엔진 분리 (라벨 누수 차단) ──
     limits = calibrate_limits(engines, calib)
@@ -128,6 +132,7 @@ def eval_train(fd: str, k: float, model: str, fuse: bool,
         "premature_alarms_first30pct": premature,
         "alarm_quality": quality,
         "alarm_quality_trivial": trivial,
+        "false_alarm": fa,
         "rul": {str(cp): {
             "evaluated": len(errs),
             "mae_cycles": round(statistics.fmean(errs), 1) if errs else None,
@@ -278,6 +283,10 @@ def main():
               f"예고부족 {q['late']} / 놓침 {q['missed']}  ({q['actionable_pct']}%)")
         print(f"  [대조군] 기준선 직후 무조건 경보 시: 유효 {t['actionable']} / "
               f"너무 이름 {t['early']}  ({t['actionable_pct']}%)")
+        f = s["false_alarm"]
+        print(f"오탐율 [잔여수명 > {f['knee']} 구간에서 울린 경보]: "
+              f"{f['false_alarms']}/{f['evaluated']}대 ({f['false_alarm_pct']}%)"
+              f" — 구간이 짧아 제외 {f['skipped_short']}대")
         for cp in CHECKPOINTS:
             r = s["rul"][str(cp)]
             print(f"RUL@고장 {cp}사이클 전: 평가 {r['evaluated']}/{s['engines_rul']}대, "
