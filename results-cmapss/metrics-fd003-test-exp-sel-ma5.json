@@ -34,6 +34,8 @@
   "answered_true_rul_median": 65.5,
   "constant_baseline_mae": 33.2,
   "constant_baseline_mae_all_engines": 35.8,
+  "typical_life": 220.5,
+  "survival_baseline_mae": 37.1,
   "sensors_backing_median": 7.5,
   "answered_on_one_sensor": 10,
   "mae_cycles": 24.1,

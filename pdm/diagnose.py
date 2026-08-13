@@ -43,30 +43,34 @@ def sensor_summary(data: MachineData) -> dict:
     }
 
 
-def build_evidence(data: MachineData, events: list[AnomalyEvent]) -> str:
-    """LLM에 전달하는 근거 텍스트 전문 (센서 요약 + 탐지 이벤트).
-
-    접지 검사가 '모델이 실제로 본 수치'와 대조해야 하므로, 프롬프트 조립과
-    검사가 같은 문자열을 쓰도록 여기 한 곳에서 만든다.
-    """
-    ev_lines = "\n".join(
+def _event_lines(events: list[AnomalyEvent]) -> str:
+    return "\n".join(
         f"- [{e.severity}] {e.sensor} ({e.start_idx}~{e.end_idx}분, {e.detector}): {e.evidence}"
         for e in events) or "- 이상 없음"
-    summary = json.dumps(sensor_summary(data), ensure_ascii=False)
-    # 설비 ID도 프롬프트에 들어가므로 근거에 포함한다 (검사 대상과 일치시킨다)
-    return (f"설비: {data.machine_id}\n센서 요약: {summary}\n"
-            f"이상 탐지 결과:\n{ev_lines}")
 
 
 def build_prompt(data: MachineData, events: list[AnomalyEvent]) -> str:
-    ev_lines = "\n".join(
-        f"- [{e.severity}] {e.sensor} ({e.start_idx}~{e.end_idx}분, {e.detector}): {e.evidence}"
-        for e in events) or "- 이상 없음"
     return PROMPT.format(
         machine_id=data.machine_id,
         summary=json.dumps(sensor_summary(data), ensure_ascii=False),
-        events=ev_lines,
+        events=_event_lines(events),
     )
+
+
+def build_evidence(data: MachineData, events: list[AnomalyEvent]) -> str:
+    """접지 검사가 대조할 근거 텍스트 — **프롬프트 전문 그대로**.
+
+    근거를 따로 조립하면 프롬프트에만 있는 수치가 생기고, 모델이 그것을
+    그대로 인용했을 때 hallucination으로 잘못 집계된다. 실제로 프롬프트의
+    "최근 1시간 평균"이 근거에서 빠져 있었다(지금은 1이 면제 목록이라
+    드러나지 않았을 뿐, 문구가 "60분"이었다면 오탐이 됐다).
+
+    프롬프트 전문을 근거로 쓰면 "모델이 본 것"과 "검사 기준"이 정의상
+    일치한다. 대가로 지시문의 상용구 수치까지 접지로 인정되지만, 그
+    방향의 오차는 hallucination 비율을 **과소** 보고할 뿐 모델에게
+    없는 죄를 씌우지 않는다.
+    """
+    return build_prompt(data, events)
 
 
 def diagnose(data: MachineData, events: list[AnomalyEvent],

@@ -235,8 +235,6 @@ def estimate_rul_exp(eng: dict[str, list[float]], upto: int,
     return estimate_rul(eng, upto, limits, model="exp")
 
 
-RUL_MODELS = {"linear": estimate_rul_linear, "exp": estimate_rul_exp}
-
 
 # ── Health index (센서 융합) ──────────────────────────────────────
 

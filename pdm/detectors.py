@@ -8,7 +8,7 @@ AnomalyEvent를 반환하고, LLM Agent는 이 결과를 해석·진단하는 �
 - 추세 기울기      : 점진적 열화 (베어링 마모) + 간이 RUL 추정
 """
 import statistics
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 
 from .simulator import MachineData
 
@@ -128,6 +128,3 @@ def run_all(data: MachineData) -> list[AnomalyEvent]:
     events += detect_trend(data.temperature, "temperature")
     return sorted(events, key=lambda e: e.start_idx)
 
-
-def events_to_dicts(events: list[AnomalyEvent]) -> list[dict]:
-    return [asdict(e) for e in events]
