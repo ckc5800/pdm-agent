@@ -18,10 +18,23 @@ NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
 # 숫자 바로 앞이 영문자이거나 "영문자-"이면 식별자의 일부로 본다.
 IDENT_PREFIX_RE = re.compile(r"[A-Za-z]-?$")
 
-# 접지 판정에서 면제할 수치 —
-# 서수/목록 번호("1.", "첫 번째")나 백분율 0/100 같은 관용 표현까지 잡으면
-# 거짓 양성만 늘어난다. 근거의 실제 측정값과 무관한 상용구다.
-EXEMPT = {"0", "1", "2", "3", "100"}
+# 목록 번호("1.", "2번째")나 백분율(0%/100%) 관용구는 측정값이 아니므로
+# 추출에서 제외한다. 값만 보고(문맥 없이) 면제하던 이전 버전은 "3도
+# 상승했습니다"처럼 근거에 없는 실측값이 우연히 이 범위면 놓치는 맹점이
+# 있었다 — 뒤에 오는 문자까지 봐야 목록 번호와 실측값을 구분할 수 있다.
+ORDINAL_TOKENS = {"1", "2", "3"}
+PERCENT_TOKENS = {"0", "100"}
+ORDINAL_SUFFIX_RE = re.compile(r"^\.(?!\d)|^번째")
+PERCENT_SUFFIX_RE = re.compile(r"^%")
+
+
+def _is_boilerplate(token: str, tail: str) -> bool:
+    """목록 번호("1." "2번째")나 백분율(0%/100%) 관용구인가 (tail = 토큰 뒤 몇 글자)."""
+    if token in ORDINAL_TOKENS and ORDINAL_SUFFIX_RE.match(tail):
+        return True
+    if token in PERCENT_TOKENS and PERCENT_SUFFIX_RE.match(tail):
+        return True
+    return False
 
 
 def rounding_tolerance(token: str) -> float:
@@ -42,11 +55,14 @@ def rounding_tolerance(token: str) -> float:
 def extract_numbers(text: str) -> list[str]:
     """텍스트에서 측정값으로 보이는 숫자 토큰을 원문 표기 그대로 뽑는다.
 
-    식별자에 붙은 숫자(PUMP-01, s21)는 제외한다 — 설비 이름을 그대로 옮겨
-    쓴 것을 '지어낸 수치'로 세면 미접지율이 100%로 나온다(실제로 그랬다).
+    식별자에 붙은 숫자(PUMP-01, s21)와 목록 번호·백분율 관용구(1., 2번째,
+    0%, 100%)는 제외한다. 전자를 빠뜨리면 설비 이름을 지어낸 수치로 잘못
+    집계하고(실제로 그랬다), 후자를 문맥 없이 면제하면 우연히 같은 값을
+    쓴 진짜 미접지 수치를 놓친다.
     """
     return [m.group() for m in NUMBER_RE.finditer(text)
-            if not IDENT_PREFIX_RE.search(text[:m.start()])]
+            if not IDENT_PREFIX_RE.search(text[:m.start()])
+            and not _is_boilerplate(m.group(), text[m.end():m.end() + 3])]
 
 
 def _as_float(tok: str) -> float | None:
@@ -57,9 +73,11 @@ def _as_float(tok: str) -> float | None:
 
 
 def is_grounded(token: str, evidence_numbers: list[float]) -> bool:
-    """숫자 하나가 근거 수치 중 하나와 (반올림 폭 안에서) 일치하는가."""
-    if token in EXEMPT:
-        return True
+    """숫자 하나가 근거 수치 중 하나와 (반올림 폭 안에서) 일치하는가.
+
+    목록 번호·백분율 관용구 면제는 extract_numbers에서 문맥으로 이미
+    걸러지므로, 여기 도달한 토큰은 전부 실측값 후보로 취급해 대조한다.
+    """
     value = _as_float(token)
     if value is None:
         return True

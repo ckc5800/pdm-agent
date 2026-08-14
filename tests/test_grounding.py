@@ -63,10 +63,24 @@ def test_rounding_tolerance_follows_written_precision():
     assert not is_grounded("2680", [2580.0])   # 100 차이는 지어낸 것
 
 
-def test_exempt_tokens_do_not_count_as_hallucination():
-    """목록 번호나 관용적 0/100은 측정값이 아니므로 면제한다."""
-    for tok in ("1", "2", "3", "100"):
-        assert is_grounded(tok, [])
+def test_ordinal_and_percent_boilerplate_not_extracted():
+    """목록 번호("1.", "2번째")나 관용적 0%/100%는 추출 단계에서 걸러진다."""
+    assert extract_numbers("1. 설비 상태 요약") == []
+    assert extract_numbers("이상 징후 3번째는 다음과 같습니다") == []
+    assert extract_numbers("미접지 0%를 달성했습니다") == []
+    assert extract_numbers("정확도 100%입니다") == []
+
+
+def test_real_small_values_are_still_caught_as_ungrounded():
+    """근거에 없는 실측값이 우연히 1~3/100 범위여도 잡아야 한다.
+
+    문맥 없이 값만 보고 면제하던 이전 버전은 이걸 놓쳤다(발견 당시엔
+    회귀 테스트가 오히려 그 맹점을 고정하고 있었다).
+    """
+    assert extract_numbers("온도가 3도 상승했습니다") == ["3"]
+    assert not is_grounded("3", [])
+    assert not is_grounded("100", [45.2])
+    assert extract_numbers("변화량은 1.5입니다") == ["1.5"]  # 소수는 서수 오판 없음
 
 
 def test_check_grounding_reports_only_real_violations():
