@@ -1,0 +1,230 @@
+{
+  "dataset": "FD002",
+  "smooth": 1,
+  "method": "ma",
+  "select": false,
+  "fuse": false,
+  "knees": [
+    75,
+    100,
+    125,
+    150,
+    175
+  ],
+  "ks": [
+    2.0,
+    2.5,
+    3.0,
+    3.5,
+    4.0
+  ],
+  "rows": [
+    {
+      "knee": 75,
+      "k": 2.0,
+      "evaluated": 130,
+      "false_alarms": 4,
+      "false_alarm_pct": 3.1,
+      "skipped_short": 0
+    },
+    {
+      "knee": 75,
+      "k": 2.5,
+      "evaluated": 130,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 0
+    },
+    {
+      "knee": 75,
+      "k": 3.0,
+      "evaluated": 130,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 0
+    },
+    {
+      "knee": 75,
+      "k": 3.5,
+      "evaluated": 130,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 0
+    },
+    {
+      "knee": 75,
+      "k": 4.0,
+      "evaluated": 130,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 0
+    },
+    {
+      "knee": 100,
+      "k": 2.0,
+      "evaluated": 125,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 5
+    },
+    {
+      "knee": 100,
+      "k": 2.5,
+      "evaluated": 125,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 5
+    },
+    {
+      "knee": 100,
+      "k": 3.0,
+      "evaluated": 125,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 5
+    },
+    {
+      "knee": 100,
+      "k": 3.5,
+      "evaluated": 125,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 5
+    },
+    {
+      "knee": 100,
+      "k": 4.0,
+      "evaluated": 125,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 5
+    },
+    {
+      "knee": 125,
+      "k": 2.0,
+      "evaluated": 101,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 29
+    },
+    {
+      "knee": 125,
+      "k": 2.5,
+      "evaluated": 101,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 29
+    },
+    {
+      "knee": 125,
+      "k": 3.0,
+      "evaluated": 101,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 29
+    },
+    {
+      "knee": 125,
+      "k": 3.5,
+      "evaluated": 101,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 29
+    },
+    {
+      "knee": 125,
+      "k": 4.0,
+      "evaluated": 101,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 29
+    },
+    {
+      "knee": 150,
+      "k": 2.0,
+      "evaluated": 71,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 59
+    },
+    {
+      "knee": 150,
+      "k": 2.5,
+      "evaluated": 71,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 59
+    },
+    {
+      "knee": 150,
+      "k": 3.0,
+      "evaluated": 71,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 59
+    },
+    {
+      "knee": 150,
+      "k": 3.5,
+      "evaluated": 71,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 59
+    },
+    {
+      "knee": 150,
+      "k": 4.0,
+      "evaluated": 71,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 59
+    },
+    {
+      "knee": 175,
+      "k": 2.0,
+      "evaluated": 45,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 85
+    },
+    {
+      "knee": 175,
+      "k": 2.5,
+      "evaluated": 45,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 85
+    },
+    {
+      "knee": 175,
+      "k": 3.0,
+      "evaluated": 45,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 85
+    },
+    {
+      "knee": 175,
+      "k": 3.5,
+      "evaluated": 45,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 85
+    },
+    {
+      "knee": 175,
+      "k": 4.0,
+      "evaluated": 45,
+      "false_alarms": 0,
+      "false_alarm_pct": 0.0,
+      "skipped_short": 85
+    }
+  ],
+  "lowest_k_with_zero_fa": {
+    "75": 2.5,
+    "100": 2.0,
+    "125": 2.0,
+    "150": 2.0,
+    "175": 2.0
+  }
+}
