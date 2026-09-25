@@ -1,0 +1,122 @@
+{
+  "dataset": "FD004",
+  "model": "exp",
+  "smooth": 5,
+  "answered": 192,
+  "engines": 248,
+  "base_coverage_pct": 77.4,
+  "curves": {
+    "support": [
+      {
+        "coverage_pct": 100,
+        "n": 192,
+        "mae": 23.0,
+        "survival_mae": 51.7
+      },
+      {
+        "coverage_pct": 90,
+        "n": 173,
+        "mae": 20.3,
+        "survival_mae": 53.7
+      },
+      {
+        "coverage_pct": 80,
+        "n": 154,
+        "mae": 16.7,
+        "survival_mae": 52.8
+      },
+      {
+        "coverage_pct": 70,
+        "n": 134,
+        "mae": 15.9,
+        "survival_mae": 54.4
+      },
+      {
+        "coverage_pct": 60,
+        "n": 115,
+        "mae": 13.5,
+        "survival_mae": 49.3
+      },
+      {
+        "coverage_pct": 50,
+        "n": 96,
+        "mae": 13.4,
+        "survival_mae": 44.4
+      },
+      {
+        "coverage_pct": 40,
+        "n": 77,
+        "mae": 12.9,
+        "survival_mae": 38.8
+      },
+      {
+        "coverage_pct": 30,
+        "n": 58,
+        "mae": 10.6,
+        "survival_mae": 34.9
+      },
+      {
+        "coverage_pct": 20,
+        "n": 38,
+        "mae": 7.3,
+        "survival_mae": 32.5
+      }
+    ],
+    "spread": [
+      {
+        "coverage_pct": 100,
+        "n": 192,
+        "mae": 23.0,
+        "survival_mae": 51.7
+      },
+      {
+        "coverage_pct": 90,
+        "n": 173,
+        "mae": 20.5,
+        "survival_mae": 53.8
+      },
+      {
+        "coverage_pct": 80,
+        "n": 154,
+        "mae": 20.8,
+        "survival_mae": 55.0
+      },
+      {
+        "coverage_pct": 70,
+        "n": 134,
+        "mae": 21.2,
+        "survival_mae": 54.4
+      },
+      {
+        "coverage_pct": 60,
+        "n": 115,
+        "mae": 22.8,
+        "survival_mae": 55.6
+      },
+      {
+        "coverage_pct": 50,
+        "n": 96,
+        "mae": 22.1,
+        "survival_mae": 53.3
+      },
+      {
+        "coverage_pct": 40,
+        "n": 77,
+        "mae": 21.7,
+        "survival_mae": 53.1
+      },
+      {
+        "coverage_pct": 30,
+        "n": 58,
+        "mae": 24.5,
+        "survival_mae": 56.3
+      },
+      {
+        "coverage_pct": 20,
+        "n": 38,
+        "mae": 26.8,
+        "survival_mae": 50.7
+      }
+    ]
+  }
+}
